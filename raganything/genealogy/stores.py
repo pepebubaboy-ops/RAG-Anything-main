@@ -20,19 +20,35 @@ class GenealogyStore(ABC):
     def upsert_person(self, spec: PersonSpec) -> PersonRecord: ...
 
     @abstractmethod
-    def upsert_family(self, parent_ids: List[str], family_type: str = "couple") -> FamilyRecord: ...
+    def upsert_family(
+        self, parent_ids: List[str], family_type: str = "couple"
+    ) -> FamilyRecord: ...
 
     @abstractmethod
     def link_parents_to_family(self, family_id: str, parent_ids: List[str]) -> None: ...
 
     @abstractmethod
-    def link_child_to_family(self, family_id: str, child_id: str, props: Optional[Dict[str, Any]] = None) -> None: ...
+    def link_child_to_family(
+        self, family_id: str, child_id: str, props: Optional[Dict[str, Any]] = None
+    ) -> None: ...
 
     @abstractmethod
-    def link_spouses(self, family_id: str, person1_id: str, person2_id: str, props: Optional[Dict[str, Any]] = None) -> None: ...
+    def link_spouses(
+        self,
+        family_id: str,
+        person1_id: str,
+        person2_id: str,
+        props: Optional[Dict[str, Any]] = None,
+    ) -> None: ...
 
     @abstractmethod
-    def create_claim(self, claim_type: str, confidence: float, data: Dict[str, Any], notes: Optional[str] = None) -> str: ...
+    def create_claim(
+        self,
+        claim_type: str,
+        confidence: float,
+        data: Dict[str, Any],
+        notes: Optional[str] = None,
+    ) -> str: ...
 
     @abstractmethod
     def attach_evidence(self, claim_id: str, evidence: Evidence) -> str: ...
@@ -52,10 +68,14 @@ class GenealogyStore(ABC):
     ) -> None: ...
 
     @abstractmethod
-    def link_claim_to_person(self, claim_id: str, person_id: str, role: str) -> None: ...
+    def link_claim_to_person(
+        self, claim_id: str, person_id: str, role: str
+    ) -> None: ...
 
     @abstractmethod
-    def link_claim_to_family(self, claim_id: str, family_id: str, role: str) -> None: ...
+    def link_claim_to_family(
+        self, claim_id: str, family_id: str, role: str
+    ) -> None: ...
 
     @abstractmethod
     def link_claim_to_media(self, claim_id: str, media_id: str, role: str) -> None: ...
@@ -122,13 +142,26 @@ class InMemoryGenealogyStore(GenealogyStore):
     def ensure_schema(self) -> None:
         return None
 
-    def _find_person(self, normalized_name: str, birth_year: Optional[int], birth_place: Optional[str]) -> Optional[PersonRecord]:
+    def _find_person(
+        self,
+        normalized_name: str,
+        birth_year: Optional[int],
+        birth_place: Optional[str],
+    ) -> Optional[PersonRecord]:
         for p in self.people.values():
             if p.normalized_name != normalized_name:
                 continue
-            if birth_year is not None and p.spec.birth_year is not None and p.spec.birth_year != birth_year:
+            if (
+                birth_year is not None
+                and p.spec.birth_year is not None
+                and p.spec.birth_year != birth_year
+            ):
                 continue
-            if birth_place is not None and p.spec.birth_place is not None and p.spec.birth_place != birth_place:
+            if (
+                birth_place is not None
+                and p.spec.birth_place is not None
+                and p.spec.birth_place != birth_place
+            ):
                 continue
             return p
         return None
@@ -148,15 +181,27 @@ class InMemoryGenealogyStore(GenealogyStore):
                 birth_year=existing.spec.birth_year or birth_year,
                 death_year=existing.spec.death_year or coerce_year(spec.death_year),
                 birth_place=existing.spec.birth_place or birth_place,
-                death_place=existing.spec.death_place or normalize_place(spec.death_place),
+                death_place=existing.spec.death_place
+                or normalize_place(spec.death_place),
                 gender=existing.spec.gender or spec.gender,
                 occupation=existing.spec.occupation or spec.occupation,
                 biography=existing.spec.biography or spec.biography,
-                aliases=sorted(set((existing.spec.aliases or []) + (spec.aliases or []))),
-                media=list(existing.spec.media or []) + [m for m in (spec.media or []) if m not in (existing.spec.media or [])],
+                aliases=sorted(
+                    set((existing.spec.aliases or []) + (spec.aliases or []))
+                ),
+                media=list(existing.spec.media or [])
+                + [
+                    m
+                    for m in (spec.media or [])
+                    if m not in (existing.spec.media or [])
+                ],
                 extra={**spec.extra, **existing.spec.extra},
             )
-            rec = PersonRecord(person_id=existing.person_id, spec=merged, normalized_name=normalized_name)
+            rec = PersonRecord(
+                person_id=existing.person_id,
+                spec=merged,
+                normalized_name=normalized_name,
+            )
             self.people[existing.person_id] = rec
             return rec
 
@@ -191,18 +236,25 @@ class InMemoryGenealogyStore(GenealogyStore):
             name=existing.spec.name,
             birth_date=existing.spec.birth_date or spec.birth_date,
             death_date=existing.spec.death_date or spec.death_date,
-            birth_year=existing.spec.birth_year or coerce_year(spec.birth_year) or coerce_year(spec.birth_date),
-            death_year=existing.spec.death_year or coerce_year(spec.death_year) or coerce_year(spec.death_date),
+            birth_year=existing.spec.birth_year
+            or coerce_year(spec.birth_year)
+            or coerce_year(spec.birth_date),
+            death_year=existing.spec.death_year
+            or coerce_year(spec.death_year)
+            or coerce_year(spec.death_date),
             birth_place=existing.spec.birth_place or normalize_place(spec.birth_place),
             death_place=existing.spec.death_place or normalize_place(spec.death_place),
             gender=existing.spec.gender or spec.gender,
             occupation=existing.spec.occupation or spec.occupation,
             biography=existing.spec.biography or spec.biography,
             aliases=sorted(set((existing.spec.aliases or []) + (spec.aliases or []))),
-            media=list(existing.spec.media or []) + [m for m in (spec.media or []) if m not in (existing.spec.media or [])],
+            media=list(existing.spec.media or [])
+            + [m for m in (spec.media or []) if m not in (existing.spec.media or [])],
             extra={**spec.extra, **existing.spec.extra},
         )
-        self.people[person_id] = PersonRecord(person_id=person_id, spec=merged, normalized_name=existing.normalized_name)
+        self.people[person_id] = PersonRecord(
+            person_id=person_id, spec=merged, normalized_name=existing.normalized_name
+        )
 
     def upsert_media(self, media: MediaSpec) -> str:
         key = _hash_key(media.kind, media.path)
@@ -232,7 +284,9 @@ class InMemoryGenealogyStore(GenealogyStore):
         if edge not in self.rel_claim_media:
             self.rel_claim_media.append(edge)
 
-    def upsert_family(self, parent_ids: List[str], family_type: str = "couple") -> FamilyRecord:
+    def upsert_family(
+        self, parent_ids: List[str], family_type: str = "couple"
+    ) -> FamilyRecord:
         if len(parent_ids) >= 2:
             a, b = sorted(parent_ids[:2])
             family_key = f"parents:{a}:{b}"
@@ -240,12 +294,22 @@ class InMemoryGenealogyStore(GenealogyStore):
                 if f.family_key == family_key:
                     return f
             family_id = f"family-{uuid.uuid4()}"
-            rec = FamilyRecord(family_id=family_id, parent_ids=[a, b], family_type=family_type, family_key=family_key)
+            rec = FamilyRecord(
+                family_id=family_id,
+                parent_ids=[a, b],
+                family_type=family_type,
+                family_key=family_key,
+            )
             self.families[family_id] = rec
             return rec
 
         family_id = f"family-{uuid.uuid4()}"
-        rec = FamilyRecord(family_id=family_id, parent_ids=list(parent_ids), family_type=family_type, family_key=None)
+        rec = FamilyRecord(
+            family_id=family_id,
+            parent_ids=list(parent_ids),
+            family_type=family_type,
+            family_key=None,
+        )
         self.families[family_id] = rec
         return rec
 
@@ -255,18 +319,32 @@ class InMemoryGenealogyStore(GenealogyStore):
             if edge not in self.rel_parent_in:
                 self.rel_parent_in.append(edge)
 
-    def link_child_to_family(self, family_id: str, child_id: str, props: Optional[Dict[str, Any]] = None) -> None:
+    def link_child_to_family(
+        self, family_id: str, child_id: str, props: Optional[Dict[str, Any]] = None
+    ) -> None:
         edge = (family_id, child_id)
         if edge not in self.rel_has_child:
             self.rel_has_child.append(edge)
 
-    def link_spouses(self, family_id: str, person1_id: str, person2_id: str, props: Optional[Dict[str, Any]] = None) -> None:
+    def link_spouses(
+        self,
+        family_id: str,
+        person1_id: str,
+        person2_id: str,
+        props: Optional[Dict[str, Any]] = None,
+    ) -> None:
         a, b = sorted([person1_id, person2_id])
         edge = (family_id, a, b)
         if edge not in self.rel_spouse_in:
             self.rel_spouse_in.append(edge)
 
-    def create_claim(self, claim_type: str, confidence: float, data: Dict[str, Any], notes: Optional[str] = None) -> str:
+    def create_claim(
+        self,
+        claim_type: str,
+        confidence: float,
+        data: Dict[str, Any],
+        notes: Optional[str] = None,
+    ) -> str:
         claim_id = f"claim-{uuid.uuid4()}"
         self.claims[claim_id] = {
             "claim_type": claim_type,
@@ -302,7 +380,9 @@ class Neo4jGenealogyStore(GenealogyStore):
       uv add --dev neo4j
     """
 
-    def __init__(self, uri: str, username: str, password: str, database: Optional[str] = None) -> None:
+    def __init__(
+        self, uri: str, username: str, password: str, database: Optional[str] = None
+    ) -> None:
         try:
             from neo4j import GraphDatabase  # type: ignore
         except Exception as e:
@@ -325,6 +405,9 @@ class Neo4jGenealogyStore(GenealogyStore):
             "CREATE CONSTRAINT claim_id IF NOT EXISTS FOR (c:Claim) REQUIRE c.claim_id IS UNIQUE",
             "CREATE CONSTRAINT evidence_id IF NOT EXISTS FOR (e:Evidence) REQUIRE e.evidence_id IS UNIQUE",
             "CREATE CONSTRAINT media_id IF NOT EXISTS FOR (m:Media) REQUIRE m.media_id IS UNIQUE",
+            "CREATE INDEX person_normalized_name IF NOT EXISTS FOR (p:Person) ON (p.normalized_name)",
+            "CREATE INDEX person_birth_year IF NOT EXISTS FOR (p:Person) ON (p.birth_year)",
+            "CREATE INDEX person_birth_place IF NOT EXISTS FOR (p:Person) ON (p.birth_place)",
         ]
         with self._driver.session(database=self._database) as session:
             for s in stmts:
@@ -349,7 +432,11 @@ class Neo4jGenealogyStore(GenealogyStore):
             RETURN p.person_id AS person_id
             LIMIT 1
             """,
-            {"normalized_name": normalized_name, "birth_year": birth_year, "birth_place": birth_place},
+            {
+                "normalized_name": normalized_name,
+                "birth_year": birth_year,
+                "birth_place": birth_place,
+            },
         )
         if rows:
             person_id = str(rows[0]["person_id"])
@@ -396,7 +483,9 @@ class Neo4jGenealogyStore(GenealogyStore):
                 """,
                 {"person_id": person_id, "aliases": list(spec.aliases)},
             )
-        return PersonRecord(person_id=person_id, spec=spec, normalized_name=normalized_name)
+        return PersonRecord(
+            person_id=person_id, spec=spec, normalized_name=normalized_name
+        )
 
     def update_person(self, person_id: str, spec: PersonSpec) -> None:
         props: Dict[str, Any] = {
@@ -507,7 +596,9 @@ class Neo4jGenealogyStore(GenealogyStore):
             {"claim_id": claim_id, "media_id": media_id, "role": role},
         )
 
-    def upsert_family(self, parent_ids: List[str], family_type: str = "couple") -> FamilyRecord:
+    def upsert_family(
+        self, parent_ids: List[str], family_type: str = "couple"
+    ) -> FamilyRecord:
         family_id = f"family-{uuid.uuid4()}"
         family_key: Optional[str] = None
         parent_ids_norm = list(parent_ids)
@@ -536,9 +627,18 @@ class Neo4jGenealogyStore(GenealogyStore):
                 SET f.created_at = timestamp()
                 SET f.updated_at = timestamp()
                 """,
-                {"family_id": family_id, "family_key": family_key, "family_type": family_type},
+                {
+                    "family_id": family_id,
+                    "family_key": family_key,
+                    "family_type": family_type,
+                },
             )
-            return FamilyRecord(family_id=family_id, parent_ids=parent_ids_norm, family_type=family_type, family_key=family_key)
+            return FamilyRecord(
+                family_id=family_id,
+                parent_ids=parent_ids_norm,
+                family_type=family_type,
+                family_key=family_key,
+            )
 
         # Single-parent or unknown: create unique family without key.
         self._run(
@@ -550,20 +650,31 @@ class Neo4jGenealogyStore(GenealogyStore):
             """,
             {"family_id": family_id, "family_type": family_type},
         )
-        return FamilyRecord(family_id=family_id, parent_ids=parent_ids_norm, family_type=family_type, family_key=None)
+        return FamilyRecord(
+            family_id=family_id,
+            parent_ids=parent_ids_norm,
+            family_type=family_type,
+            family_key=None,
+        )
 
     def link_parents_to_family(self, family_id: str, parent_ids: List[str]) -> None:
-        for pid in parent_ids:
-            self._run(
-                """
-                MATCH (p:Person {person_id: $person_id})
-                MATCH (f:Family {family_id: $family_id})
-                MERGE (p)-[:PARENT_IN]->(f)
-                """,
-                {"person_id": pid, "family_id": family_id},
-            )
+        unique_parent_ids = [pid for pid in dict.fromkeys(parent_ids) if pid]
+        if not unique_parent_ids:
+            return
 
-    def link_child_to_family(self, family_id: str, child_id: str, props: Optional[Dict[str, Any]] = None) -> None:
+        self._run(
+            """
+            MATCH (f:Family {family_id: $family_id})
+            UNWIND $parent_ids AS person_id
+            MATCH (p:Person {person_id: person_id})
+            MERGE (p)-[:PARENT_IN]->(f)
+            """,
+            {"family_id": family_id, "parent_ids": unique_parent_ids},
+        )
+
+    def link_child_to_family(
+        self, family_id: str, child_id: str, props: Optional[Dict[str, Any]] = None
+    ) -> None:
         rel_props = dict(props or {})
         self._run(
             """
@@ -575,7 +686,13 @@ class Neo4jGenealogyStore(GenealogyStore):
             {"child_id": child_id, "family_id": family_id, "props": rel_props},
         )
 
-    def link_spouses(self, family_id: str, person1_id: str, person2_id: str, props: Optional[Dict[str, Any]] = None) -> None:
+    def link_spouses(
+        self,
+        family_id: str,
+        person1_id: str,
+        person2_id: str,
+        props: Optional[Dict[str, Any]] = None,
+    ) -> None:
         rel_props = dict(props or {})
         self._run(
             """
@@ -587,10 +704,21 @@ class Neo4jGenealogyStore(GenealogyStore):
             MERGE (a)-[r:SPOUSE_OF]->(b)
             SET r += $props
             """,
-            {"a": person1_id, "b": person2_id, "family_id": family_id, "props": rel_props},
+            {
+                "a": person1_id,
+                "b": person2_id,
+                "family_id": family_id,
+                "props": rel_props,
+            },
         )
 
-    def create_claim(self, claim_type: str, confidence: float, data: Dict[str, Any], notes: Optional[str] = None) -> str:
+    def create_claim(
+        self,
+        claim_type: str,
+        confidence: float,
+        data: Dict[str, Any],
+        notes: Optional[str] = None,
+    ) -> str:
         claim_id = f"claim-{uuid.uuid4()}"
         data_json = json.dumps(data or {}, ensure_ascii=False)
         props = {
@@ -605,7 +733,10 @@ class Neo4jGenealogyStore(GenealogyStore):
             CREATE (c:Claim {claim_id: $claim_id})
             SET c += $props
             """,
-            {"claim_id": claim_id, "props": {k: v for k, v in props.items() if v is not None}},
+            {
+                "claim_id": claim_id,
+                "props": {k: v for k, v in props.items() if v is not None},
+            },
         )
         return claim_id
 

@@ -394,7 +394,9 @@ def _build_parser() -> argparse.ArgumentParser:
         sp.add_argument("--doc-id", default=None)
         sp.add_argument("--file-path", default=None)
 
-    sp_insert = sub.add_parser("insert", help="Insert content_list into a new/existing working_dir")
+    sp_insert = sub.add_parser(
+        "insert", help="Insert content_list into a new/existing working_dir"
+    )
     add_common_insert(sp_insert)
 
     sp_query = sub.add_parser("query", help="Query an existing working_dir")

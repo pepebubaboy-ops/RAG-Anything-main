@@ -334,7 +334,9 @@ class LMStudioRAGIntegration:
         try:
             print(f"📄 Processing document: {file_path}")
             effective_parse_method = parse_method or self.parse_method
-            print(f"🧩 Parser: {self.config.parser}, parse_method: {effective_parse_method}")
+            print(
+                f"🧩 Parser: {self.config.parser}, parse_method: {effective_parse_method}"
+            )
             await self.rag.process_document_complete(
                 file_path=file_path,
                 output_dir="./output_lmstudio",
@@ -403,8 +405,7 @@ class LMStudioRAGIntegration:
                     print(f"✅ Query mode switched to: {current_mode}")
                 else:
                     print(
-                        "❌ Invalid mode. Use one of: "
-                        + ", ".join(sorted(valid_modes))
+                        "❌ Invalid mode. Use one of: " + ", ".join(sorted(valid_modes))
                     )
                 continue
 

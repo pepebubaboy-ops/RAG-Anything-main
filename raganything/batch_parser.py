@@ -6,12 +6,14 @@ with progress reporting and error handling.
 """
 
 import asyncio
+import hashlib
 import logging
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
-from dataclasses import dataclass
-import time
 
 from tqdm import tqdm
 
@@ -175,17 +177,19 @@ class BatchParser:
         try:
             start_time = time.time()
 
-            # Create file-specific output directory
-            file_name = Path(file_path).stem
-            file_output_dir = Path(output_dir) / file_name
-            file_output_dir.mkdir(parents=True, exist_ok=True)
+            # Create deterministic and collision-safe file output directory
+            file_output_dir = self._build_file_output_dir(file_path, output_dir)
+
+            parser_kwargs = dict(kwargs)
+            if self.timeout_per_file and self.timeout_per_file > 0:
+                parser_kwargs.setdefault("timeout_sec", self.timeout_per_file)
 
             # Parse the document
             content_list = self.parser.parse_document(
                 file_path=file_path,
                 output_dir=str(file_output_dir),
                 method=parse_method,
-                **kwargs,
+                **parser_kwargs,
             )
 
             processing_time = time.time() - start_time
@@ -201,6 +205,16 @@ class BatchParser:
             error_msg = f"Failed to process {file_path}: {str(e)}"
             self.logger.error(error_msg)
             return False, file_path, error_msg
+
+    def _build_file_output_dir(self, file_path: str, output_dir: str) -> Path:
+        """Build deterministic output directory for a single file."""
+        file_path_obj = Path(file_path)
+        file_stem = file_path_obj.stem
+        abs_path = str(file_path_obj.expanduser().resolve())
+        path_hash = hashlib.md5(abs_path.encode("utf-8")).hexdigest()[:8]
+        file_output_dir = Path(output_dir) / f"{file_stem}-{path_hash}"
+        file_output_dir.mkdir(parents=True, exist_ok=True)
+        return file_output_dir
 
     def process_batch(
         self,
@@ -276,6 +290,7 @@ class BatchParser:
                 unit="file",
             )
 
+        future_to_file = {}
         try:
             with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
                 # Submit all tasks
@@ -291,10 +306,14 @@ class BatchParser:
                 }
 
                 # Process completed tasks
-                for future in as_completed(
-                    future_to_file, timeout=self.timeout_per_file
-                ):
-                    success, file_path, error_msg = future.result()
+                for future in as_completed(future_to_file):
+                    file_path = future_to_file[future]
+                    try:
+                        success, file_path, error_msg = future.result()
+                    except Exception as e:
+                        success = False
+                        error_msg = f"Failed to process {file_path}: {e}"
+                        self.logger.error(error_msg)
 
                     if success:
                         successful_files.append(file_path)
@@ -311,8 +330,12 @@ class BatchParser:
             for future in future_to_file:
                 if not future.done():
                     file_path = future_to_file[future]
-                    failed_files.append(file_path)
-                    errors[file_path] = f"Processing interrupted: {str(e)}"
+                    if (
+                        file_path not in successful_files
+                        and file_path not in failed_files
+                    ):
+                        failed_files.append(file_path)
+                        errors[file_path] = f"Processing interrupted: {str(e)}"
                     if pbar:
                         pbar.update(1)
 
@@ -362,17 +385,17 @@ class BatchParser:
             BatchProcessingResult with processing statistics
         """
         # Run the sync version in a thread pool
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
-            None,
+        loop = asyncio.get_running_loop()
+        process_batch_call = partial(
             self.process_batch,
-            file_paths,
-            output_dir,
-            parse_method,
-            recursive,
-            dry_run,
+            file_paths=file_paths,
+            output_dir=output_dir,
+            parse_method=parse_method,
+            recursive=recursive,
+            dry_run=dry_run,
             **kwargs,
         )
+        return await loop.run_in_executor(None, process_batch_call)
 
 
 def main():

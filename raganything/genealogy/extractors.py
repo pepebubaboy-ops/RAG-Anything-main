@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any, Dict, List, Mapping
 
 from .models import Claim
 
@@ -30,9 +30,12 @@ class MockClaimExtractor(ClaimExtractor):
         # Prefer explicit key if provided.
         if "task_key" in subject:
             return str(subject["task_key"])
-        sid = subject.get("subject_id") or subject.get("person_id") or subject.get("family_id")
+        sid = (
+            subject.get("subject_id")
+            or subject.get("person_id")
+            or subject.get("family_id")
+        )
         return f"{task_type}:{sid}"
 
     async def extract(self, task_type: str, subject: Dict[str, Any]) -> List[Claim]:
         return list(self.responses.get(self._key(task_type, subject), []))
-

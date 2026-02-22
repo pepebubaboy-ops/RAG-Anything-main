@@ -19,7 +19,7 @@ import time
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from dotenv import load_dotenv
 from lightrag.llm.openai import openai_complete_if_cache
@@ -119,13 +119,41 @@ GENDER_FEMALE_TOKENS = {
 ENTITY_TYPE_ALIASES = {
     "human": {"human", "person", "человек", "персона", "личность"},
     "animal": {"animal", "pet", "животное", "питомец", "зверь"},
-    "group": {"group", "family", "organization", "dynasty", "семья", "группа", "династия", "род"},
+    "group": {
+        "group",
+        "family",
+        "organization",
+        "dynasty",
+        "семья",
+        "группа",
+        "династия",
+        "род",
+    },
     "other_living": {"other_living", "living", "organism", "существо", "организм"},
 }
 
 RELATION_TYPE_SYNONYMS = {
-    "parent_child": {"parent_child", "child_of", "parent-of", "родитель", "родители", "отец", "мать", "сын", "дочь"},
-    "spouse": {"spouse", "married", "husband_wife", "wife_husband", "супруг", "жена", "муж", "брак"},
+    "parent_child": {
+        "parent_child",
+        "child_of",
+        "parent-of",
+        "родитель",
+        "родители",
+        "отец",
+        "мать",
+        "сын",
+        "дочь",
+    },
+    "spouse": {
+        "spouse",
+        "married",
+        "husband_wife",
+        "wife_husband",
+        "супруг",
+        "жена",
+        "муж",
+        "брак",
+    },
     "friend": {"friend", "друг", "друзья", "friend_of"},
     "enemy": {"enemy", "foe", "враг", "противник", "enemy_of"},
     "partner": {"partner", "партнер", "союзник", "пара"},
@@ -242,7 +270,9 @@ def _resolve_content_list_path(input_path: Path) -> Path:
     return candidates[0]
 
 
-def _load_pages(content_list_path: Path, max_pages: Optional[int] = None) -> Tuple[List[PageItem], str]:
+def _load_pages(
+    content_list_path: Path, max_pages: Optional[int] = None
+) -> Tuple[List[PageItem], str]:
     obj = json.loads(content_list_path.read_text(encoding="utf-8"))
     if not isinstance(obj, list):
         raise TypeError(f"content_list must be a list, got: {type(obj)}")
@@ -282,7 +312,10 @@ def _write_stage1_artifacts(output_dir: Path, pages: Sequence[PageItem]) -> None
     output_dir.mkdir(parents=True, exist_ok=True)
     with (output_dir / "pages.jsonl").open("w", encoding="utf-8") as f:
         for p in pages:
-            f.write(json.dumps({"page_idx": p.page_idx, "text": p.text}, ensure_ascii=False) + "\n")
+            f.write(
+                json.dumps({"page_idx": p.page_idx, "text": p.text}, ensure_ascii=False)
+                + "\n"
+            )
     with (output_dir / "book.txt").open("w", encoding="utf-8") as f:
         for p in pages:
             f.write(f"[PAGE {p.page_idx}]\n{p.text}\n\n")
@@ -329,7 +362,9 @@ def _chunk_pages(
             ChunkItem(
                 chunk_id=len(chunks),
                 page_indices=[p.page_idx for p in selected],
-                text="\n\n".join(f"[PAGE {p.page_idx}]\n{p.text}" for p in selected).strip(),
+                text="\n\n".join(
+                    f"[PAGE {p.page_idx}]\n{p.text}" for p in selected
+                ).strip(),
             )
         )
         if max_chunks is not None and len(chunks) >= max_chunks:
@@ -392,7 +427,10 @@ def _apply_contextual_title_to_mention_name(name: str, text: str) -> str:
     base = _normalize_surface_name(name)
     if not base:
         return base
-    if _normalize_surface_name(base).split(" ", 1)[0].lower() in CONTEXT_TITLE_DECORATORS:
+    if (
+        _normalize_surface_name(base).split(" ", 1)[0].lower()
+        in CONTEXT_TITLE_DECORATORS
+    ):
         return base
     dec = _contextual_title_for_single_token_name(base, text)
     if not dec:
@@ -458,7 +496,11 @@ def _detect_repeated_boundary_signatures(
 
     counts: Dict[str, int] = {}
     for p in pages:
-        lines = [ln.strip() for ln in str(p.text or "").replace("\r", "\n").split("\n") if ln.strip()]
+        lines = [
+            ln.strip()
+            for ln in str(p.text or "").replace("\r", "\n").split("\n")
+            if ln.strip()
+        ]
         if not lines:
             continue
         boundary_lines = [lines[0]]
@@ -624,14 +666,29 @@ def _is_valid_living_name(name: str) -> bool:
     return True
 
 
-def _canonical_entity_type(raw: Any, name: Optional[str], species: Optional[str]) -> str:
+def _canonical_entity_type(
+    raw: Any, name: Optional[str], species: Optional[str]
+) -> str:
     s = str(raw or "").strip().lower()
     for canon, aliases in ENTITY_TYPE_ALIASES.items():
         if s in aliases:
             return canon
     if species:
         sp = str(species).lower()
-        if any(k in sp for k in ("dog", "cat", "horse", "bird", "волк", "собак", "кот", "конь", "пес")):
+        if any(
+            k in sp
+            for k in (
+                "dog",
+                "cat",
+                "horse",
+                "bird",
+                "волк",
+                "собак",
+                "кот",
+                "конь",
+                "пес",
+            )
+        ):
             return "animal"
     n = (name or "").lower()
     if any(k in n for k in ("семья", "династия", "род", "клан", "группа")):
@@ -681,7 +738,9 @@ def _canonical_relation_type(raw: Any) -> str:
     return "associated_with"
 
 
-def _extract_evidence(rel: Dict[str, Any], fallback_page: Optional[int]) -> Dict[str, Any]:
+def _extract_evidence(
+    rel: Dict[str, Any], fallback_page: Optional[int]
+) -> Dict[str, Any]:
     quote: Optional[str] = None
     page_idx: Optional[int] = None
     ev = rel.get("evidence")
@@ -718,15 +777,31 @@ def _extract_endpoint(
 
     if isinstance(raw_obj, dict):
         name = _extract_name(raw_obj.get("name") or raw_obj.get("entity") or raw_obj)
-        local_id = str(raw_obj.get("id") or raw_obj.get("mention_id") or "").strip() or None
+        local_id = (
+            str(raw_obj.get("id") or raw_obj.get("mention_id") or "").strip() or None
+        )
     elif isinstance(raw_obj, str):
         name = _extract_name(raw_obj)
 
     if local_id is None:
         for key in (
-            [f"{role}_id", "from_id", "subject_id", "person1_id", "parent_id", "owner_id"]
+            [
+                f"{role}_id",
+                "from_id",
+                "subject_id",
+                "person1_id",
+                "parent_id",
+                "owner_id",
+            ]
             if role == "source"
-            else [f"{role}_id", "to_id", "object_id", "person2_id", "child_id", "pet_id"]
+            else [
+                f"{role}_id",
+                "to_id",
+                "object_id",
+                "person2_id",
+                "child_id",
+                "pet_id",
+            ]
         ):
             if key in rel and str(rel.get(key)).strip():
                 local_id = str(rel.get(key)).strip()
@@ -742,7 +817,10 @@ def _extract_endpoint(
                 break
 
     mention_id = mention_map.get(local_id) if local_id else None
-    return {"mention_id": mention_id, "name": _normalize_surface_name(name) if name else None}
+    return {
+        "mention_id": mention_id,
+        "name": _normalize_surface_name(name) if name else None,
+    }
 
 
 def _build_mentions_extraction_prompt(chunk: ChunkItem) -> str:
@@ -798,9 +876,13 @@ def _normalize_mentions_for_extraction(mentions_raw: Any) -> List[Dict[str, Any]
 
         aliases_val = m.get("aliases") or []
         if isinstance(aliases_val, str):
-            aliases = [_normalize_surface_name(x) for x in aliases_val.split(",") if x.strip()]
+            aliases = [
+                _normalize_surface_name(x) for x in aliases_val.split(",") if x.strip()
+            ]
         elif isinstance(aliases_val, list):
-            aliases = [_normalize_surface_name(str(x)) for x in aliases_val if str(x).strip()]
+            aliases = [
+                _normalize_surface_name(str(x)) for x in aliases_val if str(x).strip()
+            ]
         else:
             aliases = []
         aliases = [a for a in aliases if _is_valid_living_name(a)]
@@ -809,7 +891,9 @@ def _normalize_mentions_for_extraction(mentions_raw: Any) -> List[Dict[str, Any]
             {
                 "id": "",  # assigned below
                 "name": name,
-                "entity_type": _canonical_entity_type(m.get("entity_type"), name, m.get("species")),
+                "entity_type": _canonical_entity_type(
+                    m.get("entity_type"), name, m.get("species")
+                ),
                 "species": m.get("species"),
                 "aliases": sorted(set(aliases)),
                 "birth_year": coerce_year(m.get("birth_year")),
@@ -1053,7 +1137,9 @@ def _mention_search_forms(mention: Dict[str, Any]) -> List[str]:
     return sorted(f for f in forms if len(f) >= 2)
 
 
-def _first_keyword_position(norm_text: str, keywords: Sequence[str]) -> Tuple[Optional[int], Optional[str]]:
+def _first_keyword_position(
+    norm_text: str, keywords: Sequence[str]
+) -> Tuple[Optional[int], Optional[str]]:
     s = normalize_name(norm_text)
     best_pos: Optional[int] = None
     best_kw: Optional[str] = None
@@ -1144,7 +1230,9 @@ def _name_position_in_quote(name: str, quote_norm: str) -> Optional[int]:
     return best
 
 
-def _apply_parent_child_guardrails(relations: Sequence[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], int]:
+def _apply_parent_child_guardrails(
+    relations: Sequence[Dict[str, Any]],
+) -> Tuple[List[Dict[str, Any]], int]:
     adjusted = 0
     out: List[Dict[str, Any]] = []
     for rel in relations:
@@ -1164,10 +1252,16 @@ def _apply_parent_child_guardrails(relations: Sequence[Dict[str, Any]]) -> Tuple
             dst = row.get("target") if isinstance(row.get("target"), dict) else {}
             src_pos = _name_position_in_quote(str(src.get("name") or ""), quote_norm)
             dst_pos = _name_position_in_quote(str(dst.get("name") or ""), quote_norm)
-            parent_pos, _ = _first_keyword_position(quote_norm, KINSHIP_PARENT_ROLE_KEYWORDS)
+            parent_pos, _ = _first_keyword_position(
+                quote_norm, KINSHIP_PARENT_ROLE_KEYWORDS
+            )
             has_spouse_kw = any(k in quote_norm for k in KINSHIP_SPOUSE_ROLE_KEYWORDS)
-            has_grandchild_kw = any(k in quote_norm for k in KINSHIP_GRANDCHILD_ROLE_KEYWORDS)
-            grand_pos, _ = _first_keyword_position(quote_norm, KINSHIP_GRANDCHILD_ROLE_KEYWORDS)
+            has_grandchild_kw = any(
+                k in quote_norm for k in KINSHIP_GRANDCHILD_ROLE_KEYWORDS
+            )
+            grand_pos, _ = _first_keyword_position(
+                quote_norm, KINSHIP_GRANDCHILD_ROLE_KEYWORDS
+            )
             has_parent_kw = parent_pos is not None
             has_any_endpoint_mention = src_pos is not None or dst_pos is not None
 
@@ -1198,7 +1292,9 @@ def _apply_parent_child_guardrails(relations: Sequence[Dict[str, Any]]) -> Tuple
                     allow_grandchild_parent_orientation = True
                 else:
                     row["type"] = "relative"
-                    row["confidence"] = min(0.9, _safe_float(row.get("confidence"), 0.5))
+                    row["confidence"] = min(
+                        0.9, _safe_float(row.get("confidence"), 0.5)
+                    )
                     adjusted += 1
                     out.append(row)
                     continue
@@ -1218,7 +1314,9 @@ def _apply_parent_child_guardrails(relations: Sequence[Dict[str, Any]]) -> Tuple
                 dst_after = dst_pos > parent_pos
                 if src_after == dst_after:
                     row["type"] = "spouse" if has_spouse_kw else "relative"
-                    row["confidence"] = min(0.92, _safe_float(row.get("confidence"), 0.5))
+                    row["confidence"] = min(
+                        0.92, _safe_float(row.get("confidence"), 0.5)
+                    )
                     adjusted += 1
                     out.append(row)
                     continue
@@ -1235,7 +1333,9 @@ def _apply_parent_child_guardrails(relations: Sequence[Dict[str, Any]]) -> Tuple
                 )
                 if not valid_parent_signal:
                     row["type"] = "relative"
-                    row["confidence"] = min(0.92, _safe_float(row.get("confidence"), 0.5))
+                    row["confidence"] = min(
+                        0.92, _safe_float(row.get("confidence"), 0.5)
+                    )
                     adjusted += 1
                     out.append(row)
                     continue
@@ -1246,17 +1346,27 @@ def _apply_parent_child_guardrails(relations: Sequence[Dict[str, Any]]) -> Tuple
             quote = str(evidence.get("quote") or "")
         quote_norm = normalize_name(quote)
         has_grandchild = any(k in quote_norm for k in KINSHIP_GRANDCHILD_ROLE_KEYWORDS)
-        parent_pos, _ = _first_keyword_position(quote_norm, KINSHIP_PARENT_ROLE_KEYWORDS)
-        if parent_pos is not None and (not has_grandchild or allow_grandchild_parent_orientation):
+        parent_pos, _ = _first_keyword_position(
+            quote_norm, KINSHIP_PARENT_ROLE_KEYWORDS
+        )
+        if parent_pos is not None and (
+            not has_grandchild or allow_grandchild_parent_orientation
+        ):
             src = row.get("source") if isinstance(row.get("source"), dict) else {}
             dst = row.get("target") if isinstance(row.get("target"), dict) else {}
             src_pos = _name_position_in_quote(str(src.get("name") or ""), quote_norm)
             dst_pos = _name_position_in_quote(str(dst.get("name") or ""), quote_norm)
-            forward_context = any(k in quote_norm for k in KINSHIP_FORWARD_CONTEXT_KEYWORDS)
+            forward_context = any(
+                k in quote_norm for k in KINSHIP_FORWARD_CONTEXT_KEYWORDS
+            )
             has_collateral = any(k in quote_norm for k in KINSHIP_COLLATERAL_KEYWORDS)
             has_spouse_kw = any(k in quote_norm for k in KINSHIP_SPOUSE_ROLE_KEYWORDS)
             parent_side: Optional[str] = None
-            if (src_pos is not None or dst_pos is not None) and not has_collateral and not has_spouse_kw:
+            if (
+                (src_pos is not None or dst_pos is not None)
+                and not has_collateral
+                and not has_spouse_kw
+            ):
                 if src_pos is not None and dst_pos is not None:
                     src_before = src_pos < parent_pos
                     dst_before = dst_pos < parent_pos
@@ -1286,7 +1396,9 @@ def _apply_parent_child_guardrails(relations: Sequence[Dict[str, Any]]) -> Tuple
                         parent_side = "target" if dst_pos > parent_pos else "source"
 
             if parent_side in {"source", "target"}:
-                prev_type = _canonical_relation_type(row.get("type") or row.get("relation_type"))
+                prev_type = _canonical_relation_type(
+                    row.get("type") or row.get("relation_type")
+                )
                 prev_src = row.get("source")
                 prev_dst = row.get("target")
                 prev_conf = _safe_float(row.get("confidence"), 0.5)
@@ -1294,9 +1406,18 @@ def _apply_parent_child_guardrails(relations: Sequence[Dict[str, Any]]) -> Tuple
                 if parent_side == "target":
                     row["source"] = dict(dst)
                     row["target"] = dict(src)
-                infer_floor = 0.86 if (src_pos is not None and dst_pos is not None) else 0.8
-                row["confidence"] = max(_safe_float(row.get("confidence"), 0.5), infer_floor)
-                if row["type"] != prev_type or row.get("source") != prev_src or row.get("target") != prev_dst or _safe_float(row.get("confidence"), 0.5) != prev_conf:
+                infer_floor = (
+                    0.86 if (src_pos is not None and dst_pos is not None) else 0.8
+                )
+                row["confidence"] = max(
+                    _safe_float(row.get("confidence"), 0.5), infer_floor
+                )
+                if (
+                    row["type"] != prev_type
+                    or row.get("source") != prev_src
+                    or row.get("target") != prev_dst
+                    or _safe_float(row.get("confidence"), 0.5) != prev_conf
+                ):
                     adjusted += 1
         out.append(row)
     return out, adjusted
@@ -1351,22 +1472,32 @@ def _build_rule_based_kinship_relations(
             current_subject_id = ordered[0][0]
         ordered_before_all = sorted(pos_map.items(), key=lambda x: x[1])
 
-        parent_pos, parent_kw = _first_keyword_position(span_norm, KINSHIP_PARENT_ROLE_KEYWORDS)
+        parent_pos, parent_kw = _first_keyword_position(
+            span_norm, KINSHIP_PARENT_ROLE_KEYWORDS
+        )
         if parent_pos is not None and parent_kw:
             before = [x for x in ordered_before_all if x[1] < parent_pos]
             after = [x for x in ordered_before_all if x[1] > parent_pos]
             parent_id: Optional[str] = None
             child_id: Optional[str] = None
             prefix = span_norm[max(0, parent_pos - 28) : parent_pos]
-            is_forward_parenting = parent_kw.startswith("дет") or any(h in prefix for h in KINSHIP_PARENT_FORWARD_HINTS)
-            has_grandchild_context = any(k in span_norm for k in KINSHIP_GRANDCHILD_ROLE_KEYWORDS)
+            is_forward_parenting = parent_kw.startswith("дет") or any(
+                h in prefix for h in KINSHIP_PARENT_FORWARD_HINTS
+            )
+            has_grandchild_context = any(
+                k in span_norm for k in KINSHIP_GRANDCHILD_ROLE_KEYWORDS
+            )
             if is_forward_parenting:
                 parent_id = before[-1][0] if before else None
                 child_id = after[0][0] if after else None
             else:
                 child_id = before[0][0] if before else None
                 parent_id = after[0][0] if after else None
-                if has_grandchild_context and prev_subject_id and prev_subject_id != parent_id:
+                if (
+                    has_grandchild_context
+                    and prev_subject_id
+                    and prev_subject_id != parent_id
+                ):
                     child_id = prev_subject_id
                 elif not child_id and prev_subject_id and prev_subject_id != parent_id:
                     child_id = prev_subject_id
@@ -1374,15 +1505,23 @@ def _build_rule_based_kinship_relations(
                 out.append(
                     {
                         "type": "parent_child",
-                        "source": {"id": parent_id, "name": mention_by_id[parent_id].get("name")},
-                        "target": {"id": child_id, "name": mention_by_id[child_id].get("name")},
+                        "source": {
+                            "id": parent_id,
+                            "name": mention_by_id[parent_id].get("name"),
+                        },
+                        "target": {
+                            "id": child_id,
+                            "name": mention_by_id[child_id].get("name"),
+                        },
                         "polarity": "positive",
                         "confidence": 0.98,
                         "evidence": {"quote": span[:320], "page_idx": page_idx},
                     }
                 )
 
-        grand_pos, _ = _first_keyword_position(span_norm, KINSHIP_GRANDCHILD_ROLE_KEYWORDS)
+        grand_pos, _ = _first_keyword_position(
+            span_norm, KINSHIP_GRANDCHILD_ROLE_KEYWORDS
+        )
         if grand_pos is not None:
             before = [x for x in ordered_before_all if x[1] < grand_pos]
             after = [x for x in ordered_before_all if x[1] > grand_pos]
@@ -1392,8 +1531,14 @@ def _build_rule_based_kinship_relations(
                 out.append(
                     {
                         "type": "relative",
-                        "source": {"id": child_id, "name": mention_by_id[child_id].get("name")},
-                        "target": {"id": grandparent_id, "name": mention_by_id[grandparent_id].get("name")},
+                        "source": {
+                            "id": child_id,
+                            "name": mention_by_id[child_id].get("name"),
+                        },
+                        "target": {
+                            "id": grandparent_id,
+                            "name": mention_by_id[grandparent_id].get("name"),
+                        },
                         "polarity": "neutral",
                         "confidence": 0.94,
                         "evidence": {"quote": span[:320], "page_idx": page_idx},
@@ -1410,8 +1555,14 @@ def _build_rule_based_kinship_relations(
                 out.append(
                     {
                         "type": "spouse",
-                        "source": {"id": left_id, "name": mention_by_id[left_id].get("name")},
-                        "target": {"id": right_id, "name": mention_by_id[right_id].get("name")},
+                        "source": {
+                            "id": left_id,
+                            "name": mention_by_id[left_id].get("name"),
+                        },
+                        "target": {
+                            "id": right_id,
+                            "name": mention_by_id[right_id].get("name"),
+                        },
                         "polarity": "positive",
                         "confidence": 0.88,
                         "evidence": {"quote": span[:320], "page_idx": page_idx},
@@ -1515,7 +1666,9 @@ def _merge_candidate_pairs(
             continue
         score = _safe_float(row.get("score"), 0.0)
         dist = row.get("min_paragraph_distance")
-        hints = set(str(x).strip() for x in (row.get("relation_hints") or []) if str(x).strip())
+        hints = set(
+            str(x).strip() for x in (row.get("relation_hints") or []) if str(x).strip()
+        )
         prev = rows.get(key)
         if prev is None:
             rows[key] = {
@@ -1528,7 +1681,9 @@ def _merge_candidate_pairs(
                 "relation_hints": sorted(hints),
             }
             continue
-        prev_hints = set(str(x).strip() for x in (prev.get("relation_hints") or []) if str(x).strip())
+        prev_hints = set(
+            str(x).strip() for x in (prev.get("relation_hints") or []) if str(x).strip()
+        )
         prev_hints.update(hints)
         prev["relation_hints"] = sorted(prev_hints)
         if score > _safe_float(prev.get("score"), 0.0):
@@ -1544,7 +1699,10 @@ def _merge_candidate_pairs(
 
     ranked = sorted(
         rows.values(),
-        key=lambda x: (_safe_float(x.get("score"), 0.0), len(x.get("relation_hints") or [])),
+        key=lambda x: (
+            _safe_float(x.get("score"), 0.0),
+            len(x.get("relation_hints") or []),
+        ),
         reverse=True,
     )
     lim = max(0, int(max_candidates))
@@ -1632,7 +1790,10 @@ def _build_kinship_relation_candidates(
 
     ranked = sorted(
         rows.values(),
-        key=lambda x: (_safe_float(x.get("score"), 0.0), len(x.get("relation_hints") or [])),
+        key=lambda x: (
+            _safe_float(x.get("score"), 0.0),
+            len(x.get("relation_hints") or []),
+        ),
         reverse=True,
     )
     lim = max(0, int(max_candidates))
@@ -1651,8 +1812,12 @@ def _dedup_raw_relations(relations: Sequence[Dict[str, Any]]) -> List[Dict[str, 
             continue
         s_id = str(source.get("id") or source.get("mention_id") or "").strip()
         t_id = str(target.get("id") or target.get("mention_id") or "").strip()
-        s_name = normalize_name(_normalize_surface_name(_extract_name(source.get("name") or "")))
-        t_name = normalize_name(_normalize_surface_name(_extract_name(target.get("name") or "")))
+        s_name = normalize_name(
+            _normalize_surface_name(_extract_name(source.get("name") or ""))
+        )
+        t_name = normalize_name(
+            _normalize_surface_name(_extract_name(target.get("name") or ""))
+        )
         if not (s_id or s_name) or not (t_id or t_name):
             continue
         left = s_id or s_name
@@ -1721,8 +1886,10 @@ def _build_relation_candidates(
             min_dist = min(abs(x - y) for x in a_hits for y in b_hits)
             if min_dist > window:
                 continue
-            score = (1.0 / (1.0 + float(min_dist))) + float(a.get("confidence") or 0.0) + float(
-                b.get("confidence") or 0.0
+            score = (
+                (1.0 / (1.0 + float(min_dist)))
+                + float(a.get("confidence") or 0.0)
+                + float(b.get("confidence") or 0.0)
             )
             rows.append(
                 (
@@ -1748,7 +1915,9 @@ def _build_relation_candidates(
             b_id = str(b.get("id") or "")
             if not a_id or not b_id:
                 continue
-            score = float(a.get("confidence") or 0.0) + float(b.get("confidence") or 0.0)
+            score = float(a.get("confidence") or 0.0) + float(
+                b.get("confidence") or 0.0
+            )
             fallback.append(
                 (
                     score,
@@ -2136,7 +2305,11 @@ async def _extract_chunk(
     raw_relations_main = ""
     relations_main_repaired = False
     if mentions_clean and candidate_pairs:
-        relations_main, raw_relations_main, relations_main_repaired = await _run_relations_pass(
+        (
+            relations_main,
+            raw_relations_main,
+            relations_main_repaired,
+        ) = await _run_relations_pass(
             _build_relations_extraction_prompt(chunk, mentions_clean, candidate_pairs),
             (
                 "Ты извлекаешь только отношения между заданными парами упоминаний. "
@@ -2154,8 +2327,14 @@ async def _extract_chunk(
             [],
             max_candidates=max(0, int(kinship_pass_max_candidates)),
         )
-        relations_kinship, raw_relations_kinship, relations_kinship_repaired = await _run_relations_pass(
-            _build_kinship_relations_extraction_prompt(chunk, mentions_clean, kinship_pairs),
+        (
+            relations_kinship,
+            raw_relations_kinship,
+            relations_kinship_repaired,
+        ) = await _run_relations_pass(
+            _build_kinship_relations_extraction_prompt(
+                chunk, mentions_clean, kinship_pairs
+            ),
             (
                 "Ты извлекаешь только родственные отношения и брак. "
                 "Используй только заданные пары и верни только JSON."
@@ -2176,7 +2355,10 @@ async def _extract_chunk(
         recall_pool = _build_relation_candidates(
             mentions_clean,
             chunk.text,
-            paragraph_window=max(0, int(relation_candidate_window) + max(0, int(recall_pass_window_extra))),
+            paragraph_window=max(
+                0,
+                int(relation_candidate_window) + max(0, int(recall_pass_window_extra)),
+            ),
             max_candidates=recall_pool_limit,
         )
         seen_pairs: set[Tuple[str, str]] = set()
@@ -2193,8 +2375,14 @@ async def _extract_chunk(
     raw_relations_recall = ""
     relations_recall_repaired = False
     if enable_recall_pass and mentions_clean and recall_candidate_pairs:
-        relations_recall, raw_relations_recall, relations_recall_repaired = await _run_relations_pass(
-            _build_recall_relations_extraction_prompt(chunk, mentions_clean, recall_candidate_pairs),
+        (
+            relations_recall,
+            raw_relations_recall,
+            relations_recall_repaired,
+        ) = await _run_relations_pass(
+            _build_recall_relations_extraction_prompt(
+                chunk, mentions_clean, recall_candidate_pairs
+            ),
             (
                 "Ты извлекаешь дополнительные отношения в режиме recall. "
                 "Можно вернуть слабые связи knows/associated_with при явной текстовой опоре."
@@ -2215,7 +2403,9 @@ async def _extract_chunk(
 
     relations_raw = _dedup_raw_relations([*combined_relations, *rule_kinship_relations])
     if strict_parent_child_validation and relations_raw:
-        relations_raw, strict_parent_child_adjusted = _apply_parent_child_guardrails(relations_raw)
+        relations_raw, strict_parent_child_adjusted = _apply_parent_child_guardrails(
+            relations_raw
+        )
         relations_raw = _dedup_raw_relations(relations_raw)
 
     preview = (raw_mentions or "")[:500]
@@ -2228,7 +2418,9 @@ async def _extract_chunk(
 
     obj = {"mentions": mentions_clean, "relations": relations_raw}
     relations_repaired = bool(
-        relations_main_repaired or relations_kinship_repaired or relations_recall_repaired
+        relations_main_repaired
+        or relations_kinship_repaired
+        or relations_recall_repaired
     )
     return {
         "json": obj,
@@ -2270,12 +2462,22 @@ def _parse_extracted_chunk(chunk: ChunkItem, payload: Dict[str, Any]) -> Dict[st
             local_id = str(m.get("id") or m.get("mention_id") or f"m{idx}").strip()
             global_id = f"ch{chunk.chunk_id}:{local_id}"
             local_to_global[local_id] = global_id
-            entity_type = _canonical_entity_type(m.get("entity_type"), contextual_name, m.get("species"))
+            entity_type = _canonical_entity_type(
+                m.get("entity_type"), contextual_name, m.get("species")
+            )
             aliases_val = m.get("aliases") or []
             if isinstance(aliases_val, str):
-                aliases = [_normalize_surface_name(x) for x in aliases_val.split(",") if x.strip()]
+                aliases = [
+                    _normalize_surface_name(x)
+                    for x in aliases_val.split(",")
+                    if x.strip()
+                ]
             elif isinstance(aliases_val, list):
-                aliases = [_normalize_surface_name(str(x)) for x in aliases_val if str(x).strip()]
+                aliases = [
+                    _normalize_surface_name(str(x))
+                    for x in aliases_val
+                    if str(x).strip()
+                ]
             else:
                 aliases = []
             aliases = [a for a in aliases if _is_valid_living_name(a)]
@@ -2307,12 +2509,22 @@ def _parse_extracted_chunk(chunk: ChunkItem, payload: Dict[str, Any]) -> Dict[st
         for i, rel in enumerate(relations_raw, start=1):
             if not isinstance(rel, dict):
                 continue
-            rtype = _canonical_relation_type(rel.get("type") or rel.get("relation_type"))
+            rtype = _canonical_relation_type(
+                rel.get("type") or rel.get("relation_type")
+            )
             source = _extract_endpoint(rel, "source", local_to_global)
             target = _extract_endpoint(rel, "target", local_to_global)
-            if not source.get("mention_id") and source.get("name") and not _is_valid_living_name(str(source["name"])):
+            if (
+                not source.get("mention_id")
+                and source.get("name")
+                and not _is_valid_living_name(str(source["name"]))
+            ):
                 source["name"] = None
-            if not target.get("mention_id") and target.get("name") and not _is_valid_living_name(str(target["name"])):
+            if (
+                not target.get("mention_id")
+                and target.get("name")
+                and not _is_valid_living_name(str(target["name"]))
+            ):
                 target["name"] = None
             if not (source.get("mention_id") or source.get("name")):
                 continue
@@ -2322,7 +2534,9 @@ def _parse_extracted_chunk(chunk: ChunkItem, payload: Dict[str, Any]) -> Dict[st
             if polarity not in {"positive", "negative", "neutral"}:
                 polarity = RELATION_DEFAULT_POLARITY.get(rtype, "neutral")
             confidence = _safe_float(rel.get("confidence"), 0.5)
-            ev = _extract_evidence(rel, chunk.page_indices[0] if chunk.page_indices else None)
+            ev = _extract_evidence(
+                rel, chunk.page_indices[0] if chunk.page_indices else None
+            )
             relations.append(
                 {
                     "relation_local_id": f"ch{chunk.chunk_id}:r{i}",
@@ -2345,7 +2559,9 @@ def _parse_extracted_chunk(chunk: ChunkItem, payload: Dict[str, Any]) -> Dict[st
         "relations_main_repaired": bool(payload.get("relations_main_repaired")),
         "relations_kinship_repaired": bool(payload.get("relations_kinship_repaired")),
         "relations_recall_repaired": bool(payload.get("relations_recall_repaired")),
-        "strict_parent_child_adjusted": int(payload.get("strict_parent_child_adjusted") or 0),
+        "strict_parent_child_adjusted": int(
+            payload.get("strict_parent_child_adjusted") or 0
+        ),
         "rule_kinship_relations": int(payload.get("rule_kinship_relations") or 0),
         "candidate_pairs": int(payload.get("candidate_pairs") or 0),
         "base_candidate_pairs": int(payload.get("base_candidate_pairs") or 0),
@@ -2441,7 +2657,9 @@ def _mention_name_keys(mention: Dict[str, Any]) -> List[str]:
     return sorted(keys)
 
 
-def _identity_match_signals(mention: Dict[str, Any], entity: Dict[str, Any]) -> List[str]:
+def _identity_match_signals(
+    mention: Dict[str, Any], entity: Dict[str, Any]
+) -> List[str]:
     signals: List[str] = []
 
     m_by = coerce_year(mention.get("birth_year"))
@@ -2489,7 +2707,9 @@ def _is_identity_confirmed(mention: Dict[str, Any], entity: Dict[str, Any]) -> b
 
     m_name = str(mention.get("name") or "")
     e_name = str(entity.get("canonical_name") or "")
-    min_tokens = min(_name_identity_token_count(m_name), _name_identity_token_count(e_name))
+    min_tokens = min(
+        _name_identity_token_count(m_name), _name_identity_token_count(e_name)
+    )
     if min_tokens <= 1:
         strong = {
             "birth_year_match",
@@ -2525,7 +2745,12 @@ def _compatible_and_score(
 
     m_type = str(mention.get("entity_type") or "")
     e_type = str(entity.get("entity_type") or "")
-    if m_type and e_type and m_type != e_type and {m_type, e_type} != {"other_living", "human"}:
+    if (
+        m_type
+        and e_type
+        and m_type != e_type
+        and {m_type, e_type} != {"other_living", "human"}
+    ):
         blockers.append("entity_type_mismatch")
 
     mr = _extract_roman_numeral(m_name)
@@ -2564,7 +2789,11 @@ def _compatible_and_score(
     if m_norm and e_norm and m_norm == e_norm:
         score += 0.55
         reasons.append("exact_normalized_name")
-    elif _strip_roman(m_name) and _strip_roman(e_name) and _strip_roman(m_name) == _strip_roman(e_name):
+    elif (
+        _strip_roman(m_name)
+        and _strip_roman(e_name)
+        and _strip_roman(m_name) == _strip_roman(e_name)
+    ):
         score += 0.35
         reasons.append("same_name_without_roman")
 
@@ -2577,7 +2806,9 @@ def _compatible_and_score(
         reasons.append("medium_name_similarity")
 
     aliases = [normalize_name(x) for x in (entity.get("aliases") or [])]
-    if m_norm in aliases or e_norm in [normalize_name(x) for x in (mention.get("aliases") or [])]:
+    if m_norm in aliases or e_norm in [
+        normalize_name(x) for x in (mention.get("aliases") or [])
+    ]:
         score += 0.2
         reasons.append("alias_overlap")
 
@@ -2619,7 +2850,11 @@ def _compatible_and_score(
         score += 0.05
         reasons.append("same_birth_place")
 
-    if _last_token(m_name) and _last_token(e_name) and _last_token(m_name) == _last_token(e_name):
+    if (
+        _last_token(m_name)
+        and _last_token(e_name)
+        and _last_token(m_name) == _last_token(e_name)
+    ):
         score += 0.08
         reasons.append("same_last_token")
 
@@ -2627,19 +2862,35 @@ def _compatible_and_score(
 
 
 def _merge_mention_into_entity(entity: Dict[str, Any], mention: Dict[str, Any]) -> None:
-    if len(str(mention.get("name") or "")) > len(str(entity.get("canonical_name") or "")):
+    if len(str(mention.get("name") or "")) > len(
+        str(entity.get("canonical_name") or "")
+    ):
         entity["canonical_name"] = mention.get("name")
     entity["normalized_name"] = normalize_name(str(entity.get("canonical_name") or ""))
-    for key in ("entity_type", "species", "birth_year", "death_year", "birth_place", "death_place", "gender", "occupation", "description"):
+    for key in (
+        "entity_type",
+        "species",
+        "birth_year",
+        "death_year",
+        "birth_place",
+        "death_place",
+        "gender",
+        "occupation",
+        "description",
+    ):
         if not entity.get(key) and mention.get(key):
             entity[key] = mention[key]
-    entity["confidence"] = max(float(entity.get("confidence") or 0.0), float(mention.get("confidence") or 0.0))
+    entity["confidence"] = max(
+        float(entity.get("confidence") or 0.0), float(mention.get("confidence") or 0.0)
+    )
     aliases = set(entity.get("aliases") or [])
     aliases.update(mention.get("aliases") or [])
     n = mention.get("name")
     if n and n != entity.get("canonical_name"):
         aliases.add(n)
-    entity["aliases"] = sorted(a for a in aliases if a and a != entity.get("canonical_name"))
+    entity["aliases"] = sorted(
+        a for a in aliases if a and a != entity.get("canonical_name")
+    )
     pages = set(entity.get("source_pages") or [])
     if mention.get("page_idx") is not None:
         pages.add(int(mention["page_idx"]))
@@ -2698,7 +2949,9 @@ def _resolve_mentions_to_entities(
         mention_id = str(m.get("mention_id"))
         mention_keys = set(_mention_name_keys(m))
         best: Optional[Tuple[float, Dict[str, Any], List[str], List[str]]] = None
-        name_key_candidates: List[Tuple[float, Dict[str, Any], List[str], List[str]]] = []
+        name_key_candidates: List[
+            Tuple[float, Dict[str, Any], List[str], List[str]]
+        ] = []
         for e in entities:
             ok, score, reasons, blockers = _compatible_and_score(m, e)
             if not ok:
@@ -2730,7 +2983,11 @@ def _resolve_mentions_to_entities(
                 entity_key_cache.pop(str(best_e.get("entity_id")), None)
                 continue
 
-        if best and best[0] >= auto_merge_threshold and _is_identity_confirmed(m, best[1]):
+        if (
+            best
+            and best[0] >= auto_merge_threshold
+            and _is_identity_confirmed(m, best[1])
+        ):
             _, best_e, _, _ = best
             _merge_mention_into_entity(best_e, m)
             mention_to_entity[mention_id] = best_e["entity_id"]
@@ -2761,25 +3018,37 @@ def _resolve_mentions_to_entities(
     uniq: Dict[Tuple[str, str], Dict[str, Any]] = {}
     for p in possible_same:
         key = (p["entity_a"], p["entity_b"])
-        if key not in uniq or float(p.get("score") or 0.0) > float(uniq[key].get("score") or 0.0):
+        if key not in uniq or float(p.get("score") or 0.0) > float(
+            uniq[key].get("score") or 0.0
+        ):
             uniq[key] = p
     return entities, mention_to_entity, list(uniq.values())
 
 
-def _resolve_name_to_entity_id(name: str, entities: Sequence[Dict[str, Any]]) -> Optional[str]:
+def _resolve_name_to_entity_id(
+    name: str, entities: Sequence[Dict[str, Any]]
+) -> Optional[str]:
     n = normalize_name(name)
     if not n:
         return None
-    exact = [e for e in entities if normalize_name(str(e.get("canonical_name") or "")) == n]
+    exact = [
+        e for e in entities if normalize_name(str(e.get("canonical_name") or "")) == n
+    ]
     if len(exact) == 1:
         return exact[0]["entity_id"]
     if len(exact) > 1:
         # pick most confident if duplicate canonical names exist
         exact.sort(key=lambda x: float(x.get("confidence") or 0.0), reverse=True)
         return exact[0]["entity_id"]
-    alias_matches = [e for e in entities if n in [normalize_name(a) for a in (e.get("aliases") or [])]]
+    alias_matches = [
+        e
+        for e in entities
+        if n in [normalize_name(a) for a in (e.get("aliases") or [])]
+    ]
     if alias_matches:
-        alias_matches.sort(key=lambda x: float(x.get("confidence") or 0.0), reverse=True)
+        alias_matches.sort(
+            key=lambda x: float(x.get("confidence") or 0.0), reverse=True
+        )
         return alias_matches[0]["entity_id"]
     # variant exact match: tolerate epithets/parentheses, but require best unique overlap
     query_keys = set(_name_match_keys(name))
@@ -2818,7 +3087,9 @@ def _append_ev(dst: List[Dict[str, Any]], ev: Dict[str, Any]) -> None:
         dst.append({"quote": ev.get("quote"), "page_idx": ev.get("page_idx")})
 
 
-def _entity_summary_for_agent(entity: Dict[str, Any], mention_by_id: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+def _entity_summary_for_agent(
+    entity: Dict[str, Any], mention_by_id: Dict[str, Dict[str, Any]]
+) -> Dict[str, Any]:
     mids = [str(x) for x in (entity.get("mention_ids") or [])]
     mention_samples: List[Dict[str, Any]] = []
     for mid in mids[:6]:
@@ -2966,7 +3237,9 @@ def _score_possible_same_candidate_pair(
 
     sim_full = _name_similarity(a_norm, b_norm)
     sim_core = _name_similarity(a_core, b_core) if a_core and b_core else 0.0
-    sim_nr = _name_similarity(a_no_roman, b_no_roman) if a_no_roman and b_no_roman else 0.0
+    sim_nr = (
+        _name_similarity(a_no_roman, b_no_roman) if a_no_roman and b_no_roman else 0.0
+    )
     best_sim = max(sim_full, sim_core, sim_nr)
     if best_sim >= 0.95:
         score += 0.24
@@ -3015,7 +3288,11 @@ def _score_possible_same_candidate_pair(
         score += 0.35
         reasons.append("exact_lifespan_match")
 
-    if a_nr_tokens and b_nr_tokens and _tokens_close(a_nr_tokens[0], b_nr_tokens[0], min_ratio=0.88):
+    if (
+        a_nr_tokens
+        and b_nr_tokens
+        and _tokens_close(a_nr_tokens[0], b_nr_tokens[0], min_ratio=0.88)
+    ):
         score += 0.1
         reasons.append("same_first_name_token")
 
@@ -3048,11 +3325,17 @@ def _merge_possible_same_rows(rows: Sequence[Dict[str, Any]]) -> List[Dict[str, 
             clean["entity_a"] = aa
             clean["entity_b"] = bb
             clean["score"] = score
-            clean["reasons"] = list(dict.fromkeys(str(x) for x in (row.get("reasons") or []) if str(x)))
+            clean["reasons"] = list(
+                dict.fromkeys(str(x) for x in (row.get("reasons") or []) if str(x))
+            )
             uniq[key] = clean
             continue
         prev = uniq[key]
-        prev["reasons"] = list(dict.fromkeys(list(prev.get("reasons") or []) + list(row.get("reasons") or [])))
+        prev["reasons"] = list(
+            dict.fromkeys(
+                list(prev.get("reasons") or []) + list(row.get("reasons") or [])
+            )
+        )
         if score > float(prev.get("score") or 0.0):
             prev["score"] = score
             if row.get("trigger_mention_id"):
@@ -3123,7 +3406,9 @@ async def _llm_review_possible_same(
     entity_by_id = {str(e.get("entity_id")): e for e in entities}
     mention_by_id = {str(m.get("mention_id")): m for m in mentions}
 
-    ranked = sorted(possible_same, key=lambda x: float(x.get("score") or 0.0), reverse=True)
+    ranked = sorted(
+        possible_same, key=lambda x: float(x.get("score") or 0.0), reverse=True
+    )
     if max_candidates > 0:
         ranked = ranked[:max_candidates]
 
@@ -3158,7 +3443,8 @@ async def _llm_review_possible_same(
                 "base_reasons": list(cand.get("reasons") or []),
                 "same_entity": bool(decision.get("same_entity")),
                 "confidence": _safe_float(decision.get("confidence"), 0.0),
-                "accepted": bool(decision.get("same_entity")) and _safe_float(decision.get("confidence"), 0.0) >= min_confidence,
+                "accepted": bool(decision.get("same_entity"))
+                and _safe_float(decision.get("confidence"), 0.0) >= min_confidence,
                 "merged_name": decision.get("merged_name"),
                 "reason": decision.get("reason"),
             }
@@ -3190,18 +3476,37 @@ def _merge_entity_into_entity(dst: Dict[str, Any], src: Dict[str, Any]) -> None:
         dst["canonical_name"] = merged_name
     dst["normalized_name"] = normalize_name(str(dst.get("canonical_name") or ""))
 
-    dst["entity_type"] = _prefer_entity_type(dst.get("entity_type"), src.get("entity_type"))
+    dst["entity_type"] = _prefer_entity_type(
+        dst.get("entity_type"), src.get("entity_type")
+    )
     if not dst.get("species") and src.get("species"):
         dst["species"] = src.get("species")
     for key in ("birth_year", "death_year", "birth_place", "death_place", "gender"):
         if not dst.get(key) and src.get(key):
             dst[key] = src.get(key)
     dst["gender"] = _canonical_gender(dst.get("gender") or src.get("gender"))
-    dst["occupation"] = _merge_text_field(dst.get("occupation"), src.get("occupation"), max_len=300)
-    dst["description"] = _merge_text_field(dst.get("description"), src.get("description"), max_len=700)
-    dst["confidence"] = max(float(dst.get("confidence") or 0.0), float(src.get("confidence") or 0.0))
-    dst["source_pages"] = sorted({int(x) for x in (dst.get("source_pages") or []) + (src.get("source_pages") or [])})
-    dst["mention_ids"] = sorted({str(x) for x in (dst.get("mention_ids") or []) + (src.get("mention_ids") or []) if str(x)})
+    dst["occupation"] = _merge_text_field(
+        dst.get("occupation"), src.get("occupation"), max_len=300
+    )
+    dst["description"] = _merge_text_field(
+        dst.get("description"), src.get("description"), max_len=700
+    )
+    dst["confidence"] = max(
+        float(dst.get("confidence") or 0.0), float(src.get("confidence") or 0.0)
+    )
+    dst["source_pages"] = sorted(
+        {
+            int(x)
+            for x in (dst.get("source_pages") or []) + (src.get("source_pages") or [])
+        }
+    )
+    dst["mention_ids"] = sorted(
+        {
+            str(x)
+            for x in (dst.get("mention_ids") or []) + (src.get("mention_ids") or [])
+            if str(x)
+        }
+    )
     canonical = str(dst.get("canonical_name") or "")
     dst["aliases"] = sorted(a for a in aliases if a and a != canonical)
 
@@ -3314,7 +3619,12 @@ def _entity_merge_blockers(a: Dict[str, Any], b: Dict[str, Any]) -> List[str]:
 
     a_type = str(a.get("entity_type") or "")
     b_type = str(b.get("entity_type") or "")
-    if a_type and b_type and a_type != b_type and {a_type, b_type} != {"other_living", "human"}:
+    if (
+        a_type
+        and b_type
+        and a_type != b_type
+        and {a_type, b_type} != {"other_living", "human"}
+    ):
         blockers.append("entity_type_mismatch")
 
     a_name = str(a.get("canonical_name") or "")
@@ -3351,8 +3661,16 @@ def _entity_merge_blockers(a: Dict[str, Any], b: Dict[str, Any]) -> List[str]:
 
     a_core = _normalize_name_without_roman(a_name)
     b_core = _normalize_name_without_roman(b_name)
-    a_tokens = len([t for t in a_core.split() if t]) if a_core else _name_identity_token_count(a_name)
-    b_tokens = len([t for t in b_core.split() if t]) if b_core else _name_identity_token_count(b_name)
+    a_tokens = (
+        len([t for t in a_core.split() if t])
+        if a_core
+        else _name_identity_token_count(a_name)
+    )
+    b_tokens = (
+        len([t for t in b_core.split() if t])
+        if b_core
+        else _name_identity_token_count(b_name)
+    )
     if max(a_tokens, b_tokens) <= 1:
         if (
             str(a.get("entity_type") or "").strip().lower() == "group"
@@ -3378,8 +3696,16 @@ def _entity_merge_blockers(a: Dict[str, Any], b: Dict[str, Any]) -> List[str]:
         a_decor = set(_leading_decorator_tokens(a_name))
         b_decor = set(_leading_decorator_tokens(b_name))
         same_title_context = bool(a_decor and b_decor and a_decor == b_decor)
-        close_single_token = bool(a_first and b_first and _tokens_close(a_first, b_first, min_ratio=0.9))
-        if not (same_birth or same_death or same_regnal or alias_anchor or (same_title_context and close_single_token)):
+        close_single_token = bool(
+            a_first and b_first and _tokens_close(a_first, b_first, min_ratio=0.9)
+        )
+        if not (
+            same_birth
+            or same_death
+            or same_regnal
+            or alias_anchor
+            or (same_title_context and close_single_token)
+        ):
             blockers.append("single_token_ambiguous")
 
     return blockers
@@ -3394,7 +3720,9 @@ def _finalize_entity_remap(
     merged_entities: List[Dict[str, Any]] = []
     for eid, e in entity_by_id.items():
         if remap.get(eid, eid) == eid:
-            e["normalized_name"] = normalize_name(str(e.get("canonical_name") or e.get("normalized_name") or ""))
+            e["normalized_name"] = normalize_name(
+                str(e.get("canonical_name") or e.get("normalized_name") or "")
+            )
             merged_entities.append(e)
     merged_entities.sort(key=lambda x: str(x.get("entity_id") or ""))
 
@@ -3414,12 +3742,16 @@ def _finalize_entity_remap(
     uniq: Dict[Tuple[str, str], Dict[str, Any]] = {}
     for row in possible_rows:
         key = (row["entity_a"], row["entity_b"])
-        if key not in uniq or float(row.get("score") or 0.0) > float(uniq[key].get("score") or 0.0):
+        if key not in uniq or float(row.get("score") or 0.0) > float(
+            uniq[key].get("score") or 0.0
+        ):
             uniq[key] = row
     return merged_entities, remapped_mentions, list(uniq.values())
 
 
-def _can_auto_merge_exact_name_pair(a: Dict[str, Any], b: Dict[str, Any]) -> Tuple[bool, List[str]]:
+def _can_auto_merge_exact_name_pair(
+    a: Dict[str, Any], b: Dict[str, Any]
+) -> Tuple[bool, List[str]]:
     a_name = str(a.get("canonical_name") or "")
     b_name = str(b.get("canonical_name") or "")
     a_norm = normalize_name(str(a.get("normalized_name") or a_name))
@@ -3435,12 +3767,15 @@ def _can_auto_merge_exact_name_pair(a: Dict[str, Any], b: Dict[str, Any]) -> Tup
     if not exact_match and not core_match:
         same_title_context = bool(
             set(_leading_decorator_tokens(a_name))
-            and set(_leading_decorator_tokens(a_name)) == set(_leading_decorator_tokens(b_name))
+            and set(_leading_decorator_tokens(a_name))
+            == set(_leading_decorator_tokens(b_name))
         )
         sim = max(
             _name_similarity(a_norm, b_norm),
             _name_similarity(a_core, b_core) if a_core and b_core else 0.0,
-            _name_similarity(a_no_roman, b_no_roman) if a_no_roman and b_no_roman else 0.0,
+            _name_similarity(a_no_roman, b_no_roman)
+            if a_no_roman and b_no_roman
+            else 0.0,
         )
         if same_title_context and sim >= 0.92:
             near_match = True
@@ -3486,7 +3821,9 @@ def _can_auto_merge_exact_name_pair(a: Dict[str, Any], b: Dict[str, Any]) -> Tup
     return True, []
 
 
-def _can_auto_merge_birth_year_name_pair(a: Dict[str, Any], b: Dict[str, Any]) -> Tuple[bool, List[str]]:
+def _can_auto_merge_birth_year_name_pair(
+    a: Dict[str, Any], b: Dict[str, Any]
+) -> Tuple[bool, List[str]]:
     a_type = str(a.get("entity_type") or "")
     b_type = str(b.get("entity_type") or "")
     humanish = {"human", "other_living", ""}
@@ -3523,7 +3860,9 @@ def _can_auto_merge_birth_year_name_pair(a: Dict[str, Any], b: Dict[str, Any]) -
     b_no_roman = _normalize_name_without_roman(b_name)
     a_first = _name_first_token(a_no_roman)
     b_first = _name_first_token(b_no_roman)
-    first_name_close = bool(a_first and b_first and _tokens_close(a_first, b_first, min_ratio=0.88))
+    first_name_close = bool(
+        a_first and b_first and _tokens_close(a_first, b_first, min_ratio=0.88)
+    )
     if a_no_roman and b_no_roman and a_no_roman == b_no_roman and len(a_no_roman) >= 4:
         return True, []
 
@@ -3533,14 +3872,18 @@ def _can_auto_merge_birth_year_name_pair(a: Dict[str, Any], b: Dict[str, Any]) -
 
     sim_full = _name_similarity(a_norm, b_norm)
     sim_core = _name_similarity(a_core, b_core) if a_core and b_core else 0.0
-    sim_no_roman = _name_similarity(a_no_roman, b_no_roman) if a_no_roman and b_no_roman else 0.0
+    sim_no_roman = (
+        _name_similarity(a_no_roman, b_no_roman) if a_no_roman and b_no_roman else 0.0
+    )
     if max(sim_full, sim_core, sim_no_roman) >= (0.82 if exact_lifespan else 0.9):
         return True, []
 
     return False, ["name_similarity_too_low"]
 
 
-def _can_auto_merge_title_typo_pair(a: Dict[str, Any], b: Dict[str, Any]) -> Tuple[bool, List[str]]:
+def _can_auto_merge_title_typo_pair(
+    a: Dict[str, Any], b: Dict[str, Any]
+) -> Tuple[bool, List[str]]:
     a_name = str(a.get("canonical_name") or "")
     b_name = str(b.get("canonical_name") or "")
     a_decor = tuple(_leading_decorator_tokens(a_name))
@@ -3581,7 +3924,12 @@ def _auto_merge_title_typo_entities(
 ) -> Tuple[List[Dict[str, Any]], Dict[str, str], List[Dict[str, Any]], Dict[str, int]]:
     entity_by_id = {str(e.get("entity_id")): dict(e) for e in entities}
     if not entity_by_id:
-        return [], dict(mention_to_entity), list(possible_same), {"groups": 0, "merged_entities": 0}
+        return (
+            [],
+            dict(mention_to_entity),
+            list(possible_same),
+            {"groups": 0, "merged_entities": 0},
+        )
 
     by_decorator: Dict[Tuple[str, ...], List[str]] = {}
     for eid, e in entity_by_id.items():
@@ -3597,7 +3945,11 @@ def _auto_merge_title_typo_entities(
     for member_ids in by_decorator.values():
         if len(member_ids) < 2:
             continue
-        ranked = sorted(member_ids, key=lambda x: _entity_rank_for_merge(entity_by_id[x]), reverse=True)
+        ranked = sorted(
+            member_ids,
+            key=lambda x: _entity_rank_for_merge(entity_by_id[x]),
+            reverse=True,
+        )
         reps: List[str] = []
         group_merged = 0
         for eid in ranked:
@@ -3643,11 +3995,18 @@ def _auto_merge_exact_name_entities(
 ) -> Tuple[List[Dict[str, Any]], Dict[str, str], List[Dict[str, Any]], Dict[str, int]]:
     entity_by_id = {str(e.get("entity_id")): dict(e) for e in entities}
     if not entity_by_id:
-        return [], dict(mention_to_entity), list(possible_same), {"groups": 0, "merged_entities": 0}
+        return (
+            [],
+            dict(mention_to_entity),
+            list(possible_same),
+            {"groups": 0, "merged_entities": 0},
+        )
 
     by_norm: Dict[str, List[str]] = {}
     for eid, e in entity_by_id.items():
-        n = normalize_name(str(e.get("normalized_name") or e.get("canonical_name") or ""))
+        n = normalize_name(
+            str(e.get("normalized_name") or e.get("canonical_name") or "")
+        )
         if not n:
             continue
         by_norm.setdefault(n, []).append(eid)
@@ -3659,7 +4018,11 @@ def _auto_merge_exact_name_entities(
     for member_ids in by_norm.values():
         if len(member_ids) < 2:
             continue
-        ranked = sorted(member_ids, key=lambda x: _entity_rank_for_merge(entity_by_id[x]), reverse=True)
+        ranked = sorted(
+            member_ids,
+            key=lambda x: _entity_rank_for_merge(entity_by_id[x]),
+            reverse=True,
+        )
         reps: List[str] = []
         group_merged = 0
         for eid in ranked:
@@ -3706,7 +4069,12 @@ def _auto_merge_birth_year_name_entities(
 ) -> Tuple[List[Dict[str, Any]], Dict[str, str], List[Dict[str, Any]], Dict[str, int]]:
     entity_by_id = {str(e.get("entity_id")): dict(e) for e in entities}
     if not entity_by_id:
-        return [], dict(mention_to_entity), list(possible_same), {"groups": 0, "merged_entities": 0}
+        return (
+            [],
+            dict(mention_to_entity),
+            list(possible_same),
+            {"groups": 0, "merged_entities": 0},
+        )
 
     by_birth_year: Dict[int, List[str]] = {}
     for eid, e in entity_by_id.items():
@@ -3722,7 +4090,11 @@ def _auto_merge_birth_year_name_entities(
     for member_ids in by_birth_year.values():
         if len(member_ids) < 2:
             continue
-        ranked = sorted(member_ids, key=lambda x: _entity_rank_for_merge(entity_by_id[x]), reverse=True)
+        ranked = sorted(
+            member_ids,
+            key=lambda x: _entity_rank_for_merge(entity_by_id[x]),
+            reverse=True,
+        )
         reps: List[str] = []
         group_merged = 0
         for eid in ranked:
@@ -3733,7 +4105,9 @@ def _auto_merge_birth_year_name_entities(
             candidate = entity_by_id[eid]
             merged_into: Optional[str] = None
             for rid in reps:
-                ok, _ = _can_auto_merge_birth_year_name_pair(candidate, entity_by_id[rid])
+                ok, _ = _can_auto_merge_birth_year_name_pair(
+                    candidate, entity_by_id[rid]
+                )
                 if ok:
                     merged_into = rid
                     break
@@ -3824,7 +4198,9 @@ def _apply_llm_entity_merges(
             remap[eid] = eid
             merged_entities.append(entity_by_id[eid])
             continue
-        ranked = sorted(member_ids, key=lambda x: _entity_rank(entity_by_id[x]), reverse=True)
+        ranked = sorted(
+            member_ids, key=lambda x: _entity_rank(entity_by_id[x]), reverse=True
+        )
         rep_id = ranked[0]
         rep = dict(entity_by_id[rep_id])
         for oid in ranked[1:]:
@@ -3847,7 +4223,9 @@ def _apply_llm_entity_merges(
             freq: Dict[str, int] = {}
             for n in suggested_names:
                 freq[n] = freq.get(n, 0) + 1
-            chosen = sorted(freq.keys(), key=lambda n: (freq[n], len(n)), reverse=True)[0]
+            chosen = sorted(freq.keys(), key=lambda n: (freq[n], len(n)), reverse=True)[
+                0
+            ]
             prev_name = str(rep.get("canonical_name") or "").strip()
             if chosen and chosen != prev_name:
                 aliases = set(rep.get("aliases") or [])
@@ -3879,7 +4257,9 @@ def _apply_llm_entity_merges(
     uniq: Dict[Tuple[str, str], Dict[str, Any]] = {}
     for row in possible_rows:
         key = (row["entity_a"], row["entity_b"])
-        if key not in uniq or float(row.get("score") or 0.0) > float(uniq[key].get("score") or 0.0):
+        if key not in uniq or float(row.get("score") or 0.0) > float(
+            uniq[key].get("score") or 0.0
+        ):
             uniq[key] = row
 
     merged_entities.sort(key=lambda x: str(x.get("entity_id") or ""))
@@ -3933,10 +4313,15 @@ async def _build_graph(
             min_score=float(llm_merge_derived_min_score),
             max_pairs=int(llm_merge_derived_max_pairs),
         )
-        llm_possible_same = _merge_possible_same_rows([*possible_same, *llm_derived_candidates])
+        llm_possible_same = _merge_possible_same_rows(
+            [*possible_same, *llm_derived_candidates]
+        )
 
     llm_merge_reviews: List[Dict[str, Any]] = []
-    llm_merge_apply_stats: Dict[str, int] = {"merged_entities": 0, "name_suggestions_applied": 0}
+    llm_merge_apply_stats: Dict[str, int] = {
+        "merged_entities": 0,
+        "name_suggestions_applied": 0,
+    }
     if llm_merge_agent and llm_possible_same:
         llm_merge_reviews = await _llm_review_possible_same(
             llm_possible_same,
@@ -3950,36 +4335,48 @@ async def _build_graph(
             min_confidence=llm_merge_min_confidence,
             max_candidates=llm_merge_max_candidates,
         )
-        entities, mention_to_entity, possible_same, llm_merge_apply_stats = _apply_llm_entity_merges(
+        entities, mention_to_entity, possible_same, llm_merge_apply_stats = (
+            _apply_llm_entity_merges(
+                entities,
+                mention_to_entity,
+                possible_same,
+                llm_merge_reviews,
+            )
+        )
+
+    entities, mention_to_entity, possible_same, exact_name_merge_stats = (
+        _auto_merge_exact_name_entities(
             entities,
             mention_to_entity,
             possible_same,
-            llm_merge_reviews,
         )
+    )
+    entities, mention_to_entity, possible_same, birth_year_name_merge_stats = (
+        _auto_merge_birth_year_name_entities(
+            entities,
+            mention_to_entity,
+            possible_same,
+        )
+    )
+    entities, mention_to_entity, possible_same, title_typo_merge_stats = (
+        _auto_merge_title_typo_entities(
+            entities,
+            mention_to_entity,
+            possible_same,
+        )
+    )
 
-    entities, mention_to_entity, possible_same, exact_name_merge_stats = _auto_merge_exact_name_entities(
-        entities,
-        mention_to_entity,
-        possible_same,
-    )
-    entities, mention_to_entity, possible_same, birth_year_name_merge_stats = _auto_merge_birth_year_name_entities(
-        entities,
-        mention_to_entity,
-        possible_same,
-    )
-    entities, mention_to_entity, possible_same, title_typo_merge_stats = _auto_merge_title_typo_entities(
-        entities,
-        mention_to_entity,
-        possible_same,
-    )
-
-    entity_by_id: Dict[str, Dict[str, Any]] = {str(e["entity_id"]): e for e in entities if e.get("entity_id")}
+    entity_by_id: Dict[str, Dict[str, Any]] = {
+        str(e["entity_id"]): e for e in entities if e.get("entity_id")
+    }
     max_entity_idx = 0
     for eid in entity_by_id:
         m = re.match(r"^ent-(\d+)$", str(eid))
         if m:
             max_entity_idx = max(max_entity_idx, int(m.group(1)))
-    next_entity_idx = max_entity_idx + 1 if max_entity_idx > 0 else len(entity_by_id) + 1
+    next_entity_idx = (
+        max_entity_idx + 1 if max_entity_idx > 0 else len(entity_by_id) + 1
+    )
 
     def _ensure_entity_by_name(name: Optional[str]) -> Optional[str]:
         nonlocal next_entity_idx
@@ -4072,7 +4469,9 @@ async def _build_graph(
                     rtype = "relative"
                     age_parent_child_downgraded_total += 1
 
-        pol = str(rel.get("polarity") or RELATION_DEFAULT_POLARITY.get(rtype, "neutral")).lower()
+        pol = str(
+            rel.get("polarity") or RELATION_DEFAULT_POLARITY.get(rtype, "neutral")
+        ).lower()
         if pol not in {"positive", "negative", "neutral"}:
             pol = RELATION_DEFAULT_POLARITY.get(rtype, "neutral")
         symmetric = rtype in SYMMETRIC_RELATIONS
@@ -4125,21 +4524,44 @@ async def _build_graph(
     return {
         "entities": sorted(entities, key=lambda x: x["entity_id"]),
         "mentions": sorted(mentions_resolved, key=lambda x: x["mention_id"]),
-        "possible_same": sorted(possible_same, key=lambda x: (x["entity_a"], x["entity_b"])),
-        "relations": sorted(agg.values(), key=lambda x: (x["relation_type"], x["source_entity_id"], x["target_entity_id"])),
+        "possible_same": sorted(
+            possible_same, key=lambda x: (x["entity_a"], x["entity_b"])
+        ),
+        "relations": sorted(
+            agg.values(),
+            key=lambda x: (
+                x["relation_type"],
+                x["source_entity_id"],
+                x["target_entity_id"],
+            ),
+        ),
         "relation_claims": claim_rows,
         "llm_merge_reviews": llm_merge_reviews,
-        "llm_merge_accepted_total": sum(1 for r in llm_merge_reviews if r.get("accepted")),
-        "llm_merge_entities_merged_total": int(llm_merge_apply_stats.get("merged_entities") or 0),
-        "llm_merge_name_suggestions_applied": int(llm_merge_apply_stats.get("name_suggestions_applied") or 0),
+        "llm_merge_accepted_total": sum(
+            1 for r in llm_merge_reviews if r.get("accepted")
+        ),
+        "llm_merge_entities_merged_total": int(
+            llm_merge_apply_stats.get("merged_entities") or 0
+        ),
+        "llm_merge_name_suggestions_applied": int(
+            llm_merge_apply_stats.get("name_suggestions_applied") or 0
+        ),
         "llm_possible_same_total": len(llm_possible_same),
         "llm_derived_candidates_total": len(llm_derived_candidates),
         "exact_name_merge_groups": int(exact_name_merge_stats.get("groups") or 0),
-        "exact_name_merged_entities": int(exact_name_merge_stats.get("merged_entities") or 0),
-        "birth_year_name_merge_groups": int(birth_year_name_merge_stats.get("groups") or 0),
-        "birth_year_name_merged_entities": int(birth_year_name_merge_stats.get("merged_entities") or 0),
+        "exact_name_merged_entities": int(
+            exact_name_merge_stats.get("merged_entities") or 0
+        ),
+        "birth_year_name_merge_groups": int(
+            birth_year_name_merge_stats.get("groups") or 0
+        ),
+        "birth_year_name_merged_entities": int(
+            birth_year_name_merge_stats.get("merged_entities") or 0
+        ),
         "title_typo_merge_groups": int(title_typo_merge_stats.get("groups") or 0),
-        "title_typo_merged_entities": int(title_typo_merge_stats.get("merged_entities") or 0),
+        "title_typo_merged_entities": int(
+            title_typo_merge_stats.get("merged_entities") or 0
+        ),
         "graph_parent_child_adjusted_total": int(graph_parent_child_adjusted),
         "age_parent_child_reversed_total": int(age_parent_child_reversed_total),
         "age_parent_child_downgraded_total": int(age_parent_child_downgraded_total),
@@ -4219,7 +4641,9 @@ def _build_living_graph_view_html(
             prev["group"] = et
             prev["color"] = entity_color.get(et, "#5D6D7E")
 
-    nodes: List[Dict[str, Any]] = sorted(node_by_id.values(), key=lambda x: str(x.get("id") or ""))
+    nodes: List[Dict[str, Any]] = sorted(
+        node_by_id.values(), key=lambda x: str(x.get("id") or "")
+    )
 
     edges: List[Dict[str, Any]] = []
     node_ids = {str(n.get("id") or "") for n in nodes}
@@ -4780,7 +5204,11 @@ def _persist_graph_to_neo4j(
                     MATCH (e:Entity {entity_id: $entity_id})
                     MERGE (m)-[:REFERS_TO]->(e)
                     """,
-                    {"mention_id": m["mention_id"], "entity_id": ent_id, "props": props},
+                    {
+                        "mention_id": m["mention_id"],
+                        "entity_id": ent_id,
+                        "props": props,
+                    },
                 )
 
             for p in graph.get("possible_same") or []:
@@ -4995,7 +5423,10 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--max-chunks", type=int, default=None)
 
     p.add_argument("--model", default=os.getenv("LLM_MODEL", "qwen2.5:7b-instruct"))
-    p.add_argument("--llm-base-url", default=os.getenv("LLM_BINDING_HOST", "http://localhost:11434/v1"))
+    p.add_argument(
+        "--llm-base-url",
+        default=os.getenv("LLM_BINDING_HOST", "http://localhost:11434/v1"),
+    )
     p.add_argument("--llm-api-key", default=os.getenv("LLM_BINDING_API_KEY", "ollama"))
     p.add_argument("--llm-timeout", type=int, default=300)
     p.add_argument("--llm-max-tokens", type=int, default=900)
@@ -5003,7 +5434,9 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--min-relation-confidence", type=float, default=0.0)
     p.add_argument("--auto-merge-threshold", type=float, default=0.85)
     p.add_argument("--possible-merge-threshold", type=float, default=0.65)
-    p.add_argument("--llm-merge-agent", action=argparse.BooleanOptionalAction, default=True)
+    p.add_argument(
+        "--llm-merge-agent", action=argparse.BooleanOptionalAction, default=True
+    )
     p.add_argument("--llm-merge-min-confidence", type=float, default=0.78)
     p.add_argument("--llm-merge-max-candidates", type=int, default=120)
     p.add_argument("--llm-merge-max-tokens", type=int, default=320)
@@ -5033,7 +5466,9 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Fail run if Neo4j persistence step errors",
     )
     p.add_argument("--reset-neo4j", action="store_true")
-    p.add_argument("--neo4j-uri", default=os.getenv("NEO4J_URI", "bolt://localhost:7687"))
+    p.add_argument(
+        "--neo4j-uri", default=os.getenv("NEO4J_URI", "bolt://localhost:7687")
+    )
     p.add_argument("--neo4j-user", default=os.getenv("NEO4J_USERNAME", "neo4j"))
     p.add_argument("--neo4j-password", default=os.getenv("NEO4J_PASSWORD", "neo4j"))
     p.add_argument("--neo4j-db", default=os.getenv("NEO4J_DATABASE", None))
@@ -5043,7 +5478,11 @@ def _build_parser() -> argparse.ArgumentParser:
 async def _run(args: argparse.Namespace) -> int:
     input_path = Path(args.input).expanduser().resolve()
     content_list_path = _resolve_content_list_path(input_path)
-    out_dir = Path(args.output_dir) if args.output_dir else Path(f"./output_living_graph/run_{_now_ts()}")
+    out_dir = (
+        Path(args.output_dir)
+        if args.output_dir
+        else Path(f"./output_living_graph/run_{_now_ts()}")
+    )
     out_dir = out_dir.expanduser().resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -5072,7 +5511,9 @@ async def _run(args: argparse.Namespace) -> int:
             repeated_line_min_share=float(args.repeated_line_min_share),
         )
         if not pages:
-            raise RuntimeError("Text preparation removed all pages; adjust preprocessing settings")
+            raise RuntimeError(
+                "Text preparation removed all pages; adjust preprocessing settings"
+            )
         print(
             "  "
             f"pages_out={prep_stats['pages_out']} "
@@ -5230,17 +5671,39 @@ async def _run(args: argparse.Namespace) -> int:
             "max_chunks": int(args.max_chunks) if args.max_chunks is not None else None,
         },
         "chunks": len(chunks),
-        "candidate_pairs_total": int(sum(int(c.get("candidate_pairs") or 0) for c in parsed_chunks)),
-        "base_candidate_pairs_total": int(sum(int(c.get("base_candidate_pairs") or 0) for c in parsed_chunks)),
-        "kinship_candidate_pairs_total": int(sum(int(c.get("kinship_candidate_pairs") or 0) for c in parsed_chunks)),
-        "recall_candidate_pairs_total": int(sum(int(c.get("recall_candidate_pairs") or 0) for c in parsed_chunks)),
-        "mentions_repaired_chunks": int(sum(1 for c in parsed_chunks if c.get("mentions_repaired"))),
-        "relations_repaired_chunks": int(sum(1 for c in parsed_chunks if c.get("relations_repaired"))),
-        "relations_main_repaired_chunks": int(sum(1 for c in parsed_chunks if c.get("relations_main_repaired"))),
-        "relations_kinship_repaired_chunks": int(sum(1 for c in parsed_chunks if c.get("relations_kinship_repaired"))),
-        "relations_recall_repaired_chunks": int(sum(1 for c in parsed_chunks if c.get("relations_recall_repaired"))),
-        "strict_parent_child_adjusted_total": int(sum(int(c.get("strict_parent_child_adjusted") or 0) for c in parsed_chunks)),
-        "rule_kinship_relations_total": int(sum(int(c.get("rule_kinship_relations") or 0) for c in parsed_chunks)),
+        "candidate_pairs_total": int(
+            sum(int(c.get("candidate_pairs") or 0) for c in parsed_chunks)
+        ),
+        "base_candidate_pairs_total": int(
+            sum(int(c.get("base_candidate_pairs") or 0) for c in parsed_chunks)
+        ),
+        "kinship_candidate_pairs_total": int(
+            sum(int(c.get("kinship_candidate_pairs") or 0) for c in parsed_chunks)
+        ),
+        "recall_candidate_pairs_total": int(
+            sum(int(c.get("recall_candidate_pairs") or 0) for c in parsed_chunks)
+        ),
+        "mentions_repaired_chunks": int(
+            sum(1 for c in parsed_chunks if c.get("mentions_repaired"))
+        ),
+        "relations_repaired_chunks": int(
+            sum(1 for c in parsed_chunks if c.get("relations_repaired"))
+        ),
+        "relations_main_repaired_chunks": int(
+            sum(1 for c in parsed_chunks if c.get("relations_main_repaired"))
+        ),
+        "relations_kinship_repaired_chunks": int(
+            sum(1 for c in parsed_chunks if c.get("relations_kinship_repaired"))
+        ),
+        "relations_recall_repaired_chunks": int(
+            sum(1 for c in parsed_chunks if c.get("relations_recall_repaired"))
+        ),
+        "strict_parent_child_adjusted_total": int(
+            sum(int(c.get("strict_parent_child_adjusted") or 0) for c in parsed_chunks)
+        ),
+        "rule_kinship_relations_total": int(
+            sum(int(c.get("rule_kinship_relations") or 0) for c in parsed_chunks)
+        ),
         "mentions_total": len(graph.get("mentions") or []),
         "entities_total": len(graph.get("entities") or []),
         "possible_same_total": len(graph.get("possible_same") or []),
@@ -5249,22 +5712,38 @@ async def _run(args: argparse.Namespace) -> int:
         "llm_merge_agent_enabled": bool(args.llm_merge_agent),
         "llm_merge_reviews_total": len(graph.get("llm_merge_reviews") or []),
         "llm_merge_accepted_total": int(graph.get("llm_merge_accepted_total") or 0),
-        "llm_merge_entities_merged_total": int(graph.get("llm_merge_entities_merged_total") or 0),
-        "llm_merge_name_suggestions_applied": int(graph.get("llm_merge_name_suggestions_applied") or 0),
+        "llm_merge_entities_merged_total": int(
+            graph.get("llm_merge_entities_merged_total") or 0
+        ),
+        "llm_merge_name_suggestions_applied": int(
+            graph.get("llm_merge_name_suggestions_applied") or 0
+        ),
         "llm_possible_same_total": int(graph.get("llm_possible_same_total") or 0),
-        "llm_derived_candidates_total": int(graph.get("llm_derived_candidates_total") or 0),
+        "llm_derived_candidates_total": int(
+            graph.get("llm_derived_candidates_total") or 0
+        ),
         "llm_merge_derive_candidates": bool(args.llm_merge_derive_candidates),
         "llm_merge_derived_min_score": float(args.llm_merge_derived_min_score),
         "llm_merge_derived_max_pairs": int(args.llm_merge_derived_max_pairs),
         "exact_name_merge_groups": int(graph.get("exact_name_merge_groups") or 0),
         "exact_name_merged_entities": int(graph.get("exact_name_merged_entities") or 0),
-        "birth_year_name_merge_groups": int(graph.get("birth_year_name_merge_groups") or 0),
-        "birth_year_name_merged_entities": int(graph.get("birth_year_name_merged_entities") or 0),
+        "birth_year_name_merge_groups": int(
+            graph.get("birth_year_name_merge_groups") or 0
+        ),
+        "birth_year_name_merged_entities": int(
+            graph.get("birth_year_name_merged_entities") or 0
+        ),
         "title_typo_merge_groups": int(graph.get("title_typo_merge_groups") or 0),
         "title_typo_merged_entities": int(graph.get("title_typo_merged_entities") or 0),
-        "graph_parent_child_adjusted_total": int(graph.get("graph_parent_child_adjusted_total") or 0),
-        "age_parent_child_reversed_total": int(graph.get("age_parent_child_reversed_total") or 0),
-        "age_parent_child_downgraded_total": int(graph.get("age_parent_child_downgraded_total") or 0),
+        "graph_parent_child_adjusted_total": int(
+            graph.get("graph_parent_child_adjusted_total") or 0
+        ),
+        "age_parent_child_reversed_total": int(
+            graph.get("age_parent_child_reversed_total") or 0
+        ),
+        "age_parent_child_downgraded_total": int(
+            graph.get("age_parent_child_downgraded_total") or 0
+        ),
         "neo4j": neo4j_stats,
         "model": args.model,
     }

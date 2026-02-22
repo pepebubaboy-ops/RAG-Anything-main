@@ -13,7 +13,7 @@ import re
 import json
 import time
 import base64
-from typing import Dict, Any, Tuple, List
+from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -58,6 +58,9 @@ class ContextExtractor:
         """
         self.config = config or ContextConfig()
         self.tokenizer = tokenizer
+        self._page_text_index_cache_key: Optional[Tuple[Any, ...]] = None
+        self._page_text_index_cache: Dict[int, List[str]] = {}
+        self._page_index_build_count = 0
 
     def extract_context(
         self,
@@ -148,27 +151,51 @@ class ContextExtractor:
         start_page = max(0, current_page - window_size)
         end_page = current_page + window_size + 1
 
+        page_text_index = self._get_or_build_page_text_index(content_list)
         context_texts = []
 
-        for item in content_list:
-            item_page = item.get("page_idx", 0)
-            item_type = item.get("type", "")
-
-            # Check if item is within context window and matches filter criteria
-            if (
-                start_page <= item_page < end_page
-                and item_type in self.config.filter_content_types
-            ):
-                text_content = self._extract_text_from_item(item)
-                if text_content and text_content.strip():
-                    # Add page marker for better context understanding
-                    if item_page != current_page:
-                        context_texts.append(f"[Page {item_page}] {text_content}")
-                    else:
-                        context_texts.append(text_content)
+        for page_idx in range(start_page, end_page):
+            for text_content in page_text_index.get(page_idx, []):
+                # Add page marker for better context understanding
+                if page_idx != current_page:
+                    context_texts.append(f"[Page {page_idx}] {text_content}")
+                else:
+                    context_texts.append(text_content)
 
         context = "\n".join(context_texts)
         return self._truncate_context(context)
+
+    def _get_or_build_page_text_index(
+        self, content_list: List[Dict[str, Any]]
+    ) -> Dict[int, List[str]]:
+        """Build (or reuse) page -> extracted texts index for MinerU content lists."""
+        cache_key = (
+            id(content_list),
+            len(content_list),
+            self.config.include_headers,
+            self.config.include_captions,
+            tuple(self.config.filter_content_types),
+        )
+        if cache_key == self._page_text_index_cache_key:
+            return self._page_text_index_cache
+
+        page_text_index: Dict[int, List[str]] = {}
+        for item in content_list:
+            item_type = item.get("type", "")
+            if item_type not in self.config.filter_content_types:
+                continue
+
+            text_content = self._extract_text_from_item(item)
+            if not text_content or not text_content.strip():
+                continue
+
+            page_idx = item.get("page_idx", 0)
+            page_text_index.setdefault(page_idx, []).append(text_content)
+
+        self._page_text_index_cache_key = cache_key
+        self._page_text_index_cache = page_text_index
+        self._page_index_build_count += 1
+        return page_text_index
 
     def _extract_chunk_context(
         self, content_list: List[Dict], current_item_info: Dict

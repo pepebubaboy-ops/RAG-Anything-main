@@ -18,6 +18,7 @@ import base64
 import subprocess
 import tempfile
 import logging
+import time
 from pathlib import Path
 from typing import (
     Dict,
@@ -603,6 +604,7 @@ class MineruParser(Parser):
         device: Optional[str] = None,
         source: Optional[str] = None,
         vlm_url: Optional[str] = None,
+        timeout_sec: Optional[int] = None,
     ) -> None:
         """
         Run mineru command line tool
@@ -620,6 +622,7 @@ class MineruParser(Parser):
             device: Inference device
             source: Model source
             vlm_url: When the backend is `vlm-http-client`, you need to specify the server_url
+            timeout_sec: Optional timeout in seconds for external command execution
         """
         cmd = [
             "mineru",
@@ -657,7 +660,7 @@ class MineruParser(Parser):
             # Prepare subprocess parameters to hide console window on Windows
             import platform
             import threading
-            from queue import Queue, Empty
+            from queue import Empty, Queue
 
             # Log the command being executed
             cls.logger.info(f"Executing mineru command: {' '.join(cmd)}")
@@ -685,6 +688,25 @@ class MineruParser(Parser):
                 except Exception as e:
                     queue.put((prefix, f"Error reading {prefix}: {e}"))
 
+            def drain_output(queue, is_stderr=False):
+                while True:
+                    try:
+                        _, line = queue.get_nowait()
+                    except Empty:
+                        break
+
+                    if is_stderr:
+                        if "warning" in line.lower():
+                            cls.logger.warning(f"[MinerU] {line}")
+                        elif "error" in line.lower():
+                            cls.logger.error(f"[MinerU] {line}")
+                            error_lines.append(line.split("\n")[0])
+                        else:
+                            cls.logger.info(f"[MinerU] {line}")
+                    else:
+                        output_lines.append(line)
+                        cls.logger.info(f"[MinerU] {line}")
+
             # Start subprocess
             process = subprocess.Popen(cmd, **subprocess_kwargs)
 
@@ -706,67 +728,47 @@ class MineruParser(Parser):
             stderr_thread.start()
 
             # Process output in real time
+            start_ts = time.monotonic()
+            timed_out = False
             while process.poll() is None:
-                # Check stdout queue
-                try:
-                    while True:
-                        prefix, line = stdout_queue.get_nowait()
-                        output_lines.append(line)
-                        # Log mineru output with INFO level, prefixed with [MinerU]
-                        cls.logger.info(f"[MinerU] {line}")
-                except Empty:
-                    pass
+                drain_output(stdout_queue)
+                drain_output(stderr_queue, is_stderr=True)
 
-                # Check stderr queue
-                try:
-                    while True:
-                        prefix, line = stderr_queue.get_nowait()
-                        # Log mineru errors with WARNING level
-                        if "warning" in line.lower():
-                            cls.logger.warning(f"[MinerU] {line}")
-                        elif "error" in line.lower():
-                            cls.logger.error(f"[MinerU] {line}")
-                            error_message = line.split("\n")[0]
-                            error_lines.append(error_message)
-                        else:
-                            cls.logger.info(f"[MinerU] {line}")
-                except Empty:
-                    pass
+                if timeout_sec is not None and timeout_sec > 0:
+                    elapsed = time.monotonic() - start_ts
+                    if elapsed > timeout_sec:
+                        timed_out = True
+                        cls.logger.error(
+                            "MinerU command timed out after %ss: %s",
+                            timeout_sec,
+                            " ".join(cmd),
+                        )
+                        process.terminate()
+                        try:
+                            process.wait(timeout=5)
+                        except subprocess.TimeoutExpired:
+                            process.kill()
+                            process.wait(timeout=5)
+                        break
 
                 # Small delay to prevent busy waiting
-                import time
-
                 time.sleep(0.1)
 
-            # Process any remaining output after process completion
-            try:
-                while True:
-                    prefix, line = stdout_queue.get_nowait()
-                    output_lines.append(line)
-                    cls.logger.info(f"[MinerU] {line}")
-            except Empty:
-                pass
-
-            try:
-                while True:
-                    prefix, line = stderr_queue.get_nowait()
-                    if "warning" in line.lower():
-                        cls.logger.warning(f"[MinerU] {line}")
-                    elif "error" in line.lower():
-                        cls.logger.error(f"[MinerU] {line}")
-                        error_message = line.split("\n")[0]
-                        error_lines.append(error_message)
-                    else:
-                        cls.logger.info(f"[MinerU] {line}")
-            except Empty:
-                pass
-
-            # Wait for process to complete and get return code
-            return_code = process.wait()
+            # Process remaining buffered output after process completion
+            drain_output(stdout_queue)
+            drain_output(stderr_queue, is_stderr=True)
 
             # Wait for threads to finish
             stdout_thread.join(timeout=5)
             stderr_thread.join(timeout=5)
+
+            if timed_out:
+                raise TimeoutError(
+                    f"MinerU command timed out after {timeout_sec} seconds for {input_path}"
+                )
+
+            # Wait for process to complete and get return code
+            return_code = process.wait()
 
             if return_code != 0 or error_lines:
                 cls.logger.info("[MinerU] Command executed failed")
@@ -775,6 +777,8 @@ class MineruParser(Parser):
                 cls.logger.info("[MinerU] Command executed successfully")
 
         except MineruExecutionError:
+            raise
+        except TimeoutError:
             raise
         except subprocess.CalledProcessError as e:
             cls.logger.error(f"Error running mineru subprocess command: {e}")
@@ -1377,6 +1381,7 @@ class DoclingParser(Parser):
         input_path: Union[str, Path],
         output_dir: Union[str, Path],
         file_stem: str,
+        timeout_sec: Optional[int] = None,
         **kwargs,
     ) -> None:
         """
@@ -1386,6 +1391,7 @@ class DoclingParser(Parser):
             input_path: Path to input file or directory
             output_dir: Output directory path
             file_stem: File stem for creating subdirectory
+            timeout_sec: Optional timeout in seconds for each docling command
             **kwargs: Additional parameters for docling command
         """
         # Create subdirectory structure similar to MinerU
@@ -1425,13 +1431,25 @@ class DoclingParser(Parser):
             if platform.system() == "Windows":
                 docling_subprocess_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
 
-            result_json = subprocess.run(cmd_json, **docling_subprocess_kwargs)
-            result_md = subprocess.run(cmd_md, **docling_subprocess_kwargs)
+            result_json = subprocess.run(
+                cmd_json,
+                timeout=timeout_sec,
+                **docling_subprocess_kwargs,
+            )
+            result_md = subprocess.run(
+                cmd_md,
+                timeout=timeout_sec,
+                **docling_subprocess_kwargs,
+            )
             self.logger.info("Docling command executed successfully")
             if result_json.stdout:
                 self.logger.debug(f"JSON cmd output: {result_json.stdout}")
             if result_md.stdout:
                 self.logger.debug(f"Markdown cmd output: {result_md.stdout}")
+        except subprocess.TimeoutExpired as e:
+            raise RuntimeError(
+                f"Docling command timed out after {timeout_sec} seconds for {input_path}"
+            ) from e
         except subprocess.CalledProcessError as e:
             self.logger.error(f"Error running docling command: {e}")
             if e.stderr:

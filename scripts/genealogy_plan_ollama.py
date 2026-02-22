@@ -15,7 +15,6 @@ import argparse
 import asyncio
 import json
 import os
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import numpy as np
@@ -176,7 +175,9 @@ Rules:
 """
 
 
-def _task_prompt(task_type: str, subject: Dict[str, Any], retrieved_context: str) -> str:
+def _task_prompt(
+    task_type: str, subject: Dict[str, Any], retrieved_context: str
+) -> str:
     if task_type == "find_parents":
         person: PersonSpec = subject["person"]
         return f"""
@@ -300,11 +301,13 @@ Context:
 {retrieved_context}
 """.strip()
 
-    return f'{{"claims":[]}}'
+    return '{"claims":[]}'
 
 
 class OllamaGenealogyExtractor(ClaimExtractor):
-    def __init__(self, rag: RAGAnything, mode: str = "hybrid", debug: bool = False) -> None:
+    def __init__(
+        self, rag: RAGAnything, mode: str = "hybrid", debug: bool = False
+    ) -> None:
         self.rag = rag
         self.mode = mode
         self.debug = debug
@@ -446,11 +449,17 @@ Raw extraction output:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="Genealogy expansion runner (Neo4j + RAGAnything)")
+    p = argparse.ArgumentParser(
+        description="Genealogy expansion runner (Neo4j + RAGAnything)"
+    )
     sub = p.add_subparsers(dest="cmd", required=True)
 
     sp_run = sub.add_parser("run", help="Seed + expand into Neo4j")
-    sp_run.add_argument("--rag-working-dir", required=True, help="Existing LightRAG working_dir with indexed sources")
+    sp_run.add_argument(
+        "--rag-working-dir",
+        required=True,
+        help="Existing LightRAG working_dir with indexed sources",
+    )
     sp_run.add_argument("--name", required=True, help="Seed person name")
     sp_run.add_argument("--birth-date", default=None)
     sp_run.add_argument("--birth-year", type=int, default=None)
@@ -462,14 +471,28 @@ def _build_parser() -> argparse.ArgumentParser:
     sp_run.add_argument("--gender", default=None)
     sp_run.add_argument("--max-depth", type=int, default=3)
     sp_run.add_argument("--max-tasks", type=int, default=80)
-    sp_run.add_argument("--mode", default="hybrid", choices=["local", "global", "hybrid", "naive", "mix", "bypass"])
-    sp_run.add_argument("--no-spouses", action="store_true", help="Disable spouse/descendant expansion")
-    sp_run.add_argument("--no-profiles", action="store_true", help="Disable profile extraction (birth/death/occupation/etc)")
+    sp_run.add_argument(
+        "--mode",
+        default="hybrid",
+        choices=["local", "global", "hybrid", "naive", "mix", "bypass"],
+    )
+    sp_run.add_argument(
+        "--no-spouses", action="store_true", help="Disable spouse/descendant expansion"
+    )
+    sp_run.add_argument(
+        "--no-profiles",
+        action="store_true",
+        help="Disable profile extraction (birth/death/occupation/etc)",
+    )
     sp_run.add_argument("--debug", action="store_true")
 
-    sp_run.add_argument("--neo4j-uri", default=os.getenv("NEO4J_URI", "bolt://localhost:7687"))
+    sp_run.add_argument(
+        "--neo4j-uri", default=os.getenv("NEO4J_URI", "bolt://localhost:7687")
+    )
     sp_run.add_argument("--neo4j-user", default=os.getenv("NEO4J_USERNAME", "neo4j"))
-    sp_run.add_argument("--neo4j-password", default=os.getenv("NEO4J_PASSWORD", "neo4j"))
+    sp_run.add_argument(
+        "--neo4j-password", default=os.getenv("NEO4J_PASSWORD", "neo4j")
+    )
     sp_run.add_argument("--neo4j-db", default=os.getenv("NEO4J_DATABASE", None))
 
     sp_mock = sub.add_parser("smoke-mock", help="Offline smoke run (no Neo4j, no LLM)")
@@ -497,7 +520,12 @@ async def cmd_smoke_mock(args: argparse.Namespace) -> int:
                             "parents": [{"name": "Bob Doe"}, {"name": "Carol Smith"}],
                             "child": {"name": "Alice Doe", "birth_year": 1980},
                         },
-                        evidence=[Evidence(file_path="toy.txt", quote="Alice, daughter of Bob and Carol")],
+                        evidence=[
+                            Evidence(
+                                file_path="toy.txt",
+                                quote="Alice, daughter of Bob and Carol",
+                            )
+                        ],
                     )
                 ]
 
@@ -509,10 +537,18 @@ async def cmd_smoke_mock(args: argparse.Namespace) -> int:
                             claim_type="parent_child",
                             confidence=0.8,
                             data={
-                                "parents": [{"name": "Bob Doe"}, {"name": "Carol Smith"}],
+                                "parents": [
+                                    {"name": "Bob Doe"},
+                                    {"name": "Carol Smith"},
+                                ],
                                 "child": {"name": "David Doe", "birth_year": 1982},
                             },
-                            evidence=[Evidence(file_path="toy.txt", quote="Bob and Carol had a son David")],
+                            evidence=[
+                                Evidence(
+                                    file_path="toy.txt",
+                                    quote="Bob and Carol had a son David",
+                                )
+                            ],
                         )
                     ]
                 if set(parents) == {"David Doe", "Emma Roe"}:
@@ -521,10 +557,18 @@ async def cmd_smoke_mock(args: argparse.Namespace) -> int:
                             claim_type="parent_child",
                             confidence=0.85,
                             data={
-                                "parents": [{"name": "David Doe"}, {"name": "Emma Roe"}],
+                                "parents": [
+                                    {"name": "David Doe"},
+                                    {"name": "Emma Roe"},
+                                ],
                                 "child": {"name": "Frank Doe", "birth_year": 2010},
                             },
-                            evidence=[Evidence(file_path="toy.txt", quote="Frank, child of David and Emma")],
+                            evidence=[
+                                Evidence(
+                                    file_path="toy.txt",
+                                    quote="Frank, child of David and Emma",
+                                )
+                            ],
                         )
                     ]
             if task_type == "find_spouses" and subject["person"].name == "David Doe":
@@ -532,8 +576,13 @@ async def cmd_smoke_mock(args: argparse.Namespace) -> int:
                     Claim(
                         claim_type="spouse",
                         confidence=0.7,
-                        data={"person1": {"name": "David Doe"}, "person2": {"name": "Emma Roe"}},
-                        evidence=[Evidence(file_path="toy.txt", quote="David married Emma")],
+                        data={
+                            "person1": {"name": "David Doe"},
+                            "person2": {"name": "Emma Roe"},
+                        },
+                        evidence=[
+                            Evidence(file_path="toy.txt", quote="David married Emma")
+                        ],
                     )
                 ]
             if task_type == "find_profile" and subject["person"].name == "David Doe":
@@ -595,7 +644,9 @@ async def cmd_smoke_mock(args: argparse.Namespace) -> int:
     )
     print("Families:", len(store.families))
     if store.media:
-        print("Media:", [{"kind": m.kind, "path": m.path} for m in store.media.values()])
+        print(
+            "Media:", [{"kind": m.kind, "path": m.path} for m in store.media.values()]
+        )
     return 0
 
 

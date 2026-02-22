@@ -101,34 +101,31 @@ class ProcessorMixin:
         Returns:
             str: Content-based document ID with doc- prefix
         """
-        from lightrag.utils import compute_mdhash_id
-
-        # Extract key content for ID generation
-        content_hash_data = []
-
+        hasher = hashlib.md5()
+        has_content = False
         for item in content_list:
             if isinstance(item, dict):
                 # For text content, use the text
                 if item.get("type") == "text" and item.get("text"):
-                    content_hash_data.append(item["text"].strip())
+                    chunk = item["text"].strip()
                 # For other content types, use key identifiers
                 elif item.get("type") == "image" and item.get("img_path"):
-                    content_hash_data.append(f"image:{item['img_path']}")
+                    chunk = f"image:{item['img_path']}"
                 elif item.get("type") == "table" and item.get("table_body"):
-                    content_hash_data.append(f"table:{item['table_body']}")
+                    chunk = f"table:{item['table_body']}"
                 elif item.get("type") == "equation" and item.get("text"):
-                    content_hash_data.append(f"equation:{item['text']}")
+                    chunk = f"equation:{item['text']}"
                 else:
                     # For other types, use string representation
-                    content_hash_data.append(str(item))
+                    chunk = str(item)
 
-        # Create a content signature
-        content_signature = "\n".join(content_hash_data)
+                if has_content:
+                    hasher.update(b"\n")
+                hasher.update(chunk.encode("utf-8"))
+                has_content = True
 
         # Generate doc_id from content
-        doc_id = compute_mdhash_id(content_signature, prefix="doc-")
-
-        return doc_id
+        return f"doc-{hasher.hexdigest()}"
 
     async def _get_cached_result(
         self, cache_key: str, file_path: Path, parse_method: str = None, **kwargs

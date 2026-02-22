@@ -22,7 +22,9 @@ from typing import Any, Dict
 def _load_pipeline_module():
     root = Path(__file__).resolve().parent
     pipeline_path = root / "living_graph_pipeline.py"
-    spec = importlib.util.spec_from_file_location("living_graph_pipeline_rebuild", str(pipeline_path))
+    spec = importlib.util.spec_from_file_location(
+        "living_graph_pipeline_rebuild", str(pipeline_path)
+    )
     if spec is None or spec.loader is None:
         raise RuntimeError(f"Cannot load module from: {pipeline_path}")
     module = importlib.util.module_from_spec(spec)
@@ -32,19 +34,54 @@ def _load_pipeline_module():
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="Rebuild living graph from raw extractions (stage 4/5 only)")
-    p.add_argument("--run-dir", required=True, help="Directory with raw_extractions_general.json")
-    p.add_argument("--output-dir", default=None, help="Output dir (default: <run-dir>_rebuild)")
+    p = argparse.ArgumentParser(
+        description="Rebuild living graph from raw extractions (stage 4/5 only)"
+    )
+    p.add_argument(
+        "--run-dir", required=True, help="Directory with raw_extractions_general.json"
+    )
+    p.add_argument(
+        "--output-dir", default=None, help="Output dir (default: <run-dir>_rebuild)"
+    )
     p.add_argument("--model", default=None, help="LLM model override")
-    p.add_argument("--llm-base-url", default=os.getenv("LLM_BINDING_HOST", "http://localhost:11434/v1"))
+    p.add_argument(
+        "--llm-base-url",
+        default=os.getenv("LLM_BINDING_HOST", "http://localhost:11434/v1"),
+    )
     p.add_argument("--llm-api-key", default=os.getenv("LLM_BINDING_API_KEY", "ollama"))
-    p.add_argument("--llm-timeout", type=int, default=int(os.getenv("LLM_TIMEOUT", "300")))
-    p.add_argument("--min-relation-confidence", type=float, default=float(os.getenv("MIN_RELATION_CONFIDENCE", "0.0")))
-    p.add_argument("--auto-merge-threshold", type=float, default=float(os.getenv("AUTO_MERGE_THRESHOLD", "0.85")))
-    p.add_argument("--possible-merge-threshold", type=float, default=float(os.getenv("POSSIBLE_MERGE_THRESHOLD", "0.65")))
-    p.add_argument("--llm-merge-min-confidence", type=float, default=float(os.getenv("LLM_MERGE_MIN_CONFIDENCE", "0.78")))
-    p.add_argument("--llm-merge-max-candidates", type=int, default=int(os.getenv("LLM_MERGE_MAX_CANDIDATES", "120")))
-    p.add_argument("--llm-merge-max-tokens", type=int, default=int(os.getenv("LLM_MERGE_MAX_TOKENS", "320")))
+    p.add_argument(
+        "--llm-timeout", type=int, default=int(os.getenv("LLM_TIMEOUT", "300"))
+    )
+    p.add_argument(
+        "--min-relation-confidence",
+        type=float,
+        default=float(os.getenv("MIN_RELATION_CONFIDENCE", "0.0")),
+    )
+    p.add_argument(
+        "--auto-merge-threshold",
+        type=float,
+        default=float(os.getenv("AUTO_MERGE_THRESHOLD", "0.85")),
+    )
+    p.add_argument(
+        "--possible-merge-threshold",
+        type=float,
+        default=float(os.getenv("POSSIBLE_MERGE_THRESHOLD", "0.65")),
+    )
+    p.add_argument(
+        "--llm-merge-min-confidence",
+        type=float,
+        default=float(os.getenv("LLM_MERGE_MIN_CONFIDENCE", "0.78")),
+    )
+    p.add_argument(
+        "--llm-merge-max-candidates",
+        type=int,
+        default=int(os.getenv("LLM_MERGE_MAX_CANDIDATES", "120")),
+    )
+    p.add_argument(
+        "--llm-merge-max-tokens",
+        type=int,
+        default=int(os.getenv("LLM_MERGE_MAX_TOKENS", "320")),
+    )
     p.add_argument(
         "--llm-merge-derived-min-score",
         type=float,
@@ -55,10 +92,20 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         default=int(os.getenv("LLM_MERGE_DERIVED_MAX_PAIRS", "240")),
     )
-    p.add_argument("--llm-merge-agent", action=argparse.BooleanOptionalAction, default=True)
-    p.add_argument("--llm-merge-derive-candidates", action=argparse.BooleanOptionalAction, default=True)
-    p.add_argument("--persist-neo4j", action=argparse.BooleanOptionalAction, default=False)
-    p.add_argument("--neo4j-uri", default=os.getenv("NEO4J_URI", "bolt://localhost:7687"))
+    p.add_argument(
+        "--llm-merge-agent", action=argparse.BooleanOptionalAction, default=True
+    )
+    p.add_argument(
+        "--llm-merge-derive-candidates",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    p.add_argument(
+        "--persist-neo4j", action=argparse.BooleanOptionalAction, default=False
+    )
+    p.add_argument(
+        "--neo4j-uri", default=os.getenv("NEO4J_URI", "bolt://localhost:7687")
+    )
     p.add_argument("--neo4j-user", default=os.getenv("NEO4J_USERNAME", "neo4j"))
     p.add_argument("--neo4j-password", default=os.getenv("NEO4J_PASSWORD", "neo4j"))
     p.add_argument("--neo4j-db", default=os.getenv("NEO4J_DATABASE", ""))
@@ -80,7 +127,11 @@ async def _run(args: argparse.Namespace) -> int:
         summary = json.loads(summary_path.read_text(encoding="utf-8"))
 
     model = args.model or summary.get("model") or os.getenv("LLM_MODEL", "qwen2.5:32b")
-    output_dir = Path(args.output_dir).resolve() if args.output_dir else Path(f"{run_dir}_rebuild").resolve()
+    output_dir = (
+        Path(args.output_dir).resolve()
+        if args.output_dir
+        else Path(f"{run_dir}_rebuild").resolve()
+    )
     output_dir.mkdir(parents=True, exist_ok=True)
 
     graph = await lg._build_graph(
@@ -144,4 +195,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

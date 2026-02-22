@@ -23,9 +23,7 @@ def extract_json_candidates(text: str) -> List[str]:
     candidates: List[str] = []
 
     # Code blocks first.
-    candidates.extend(
-        re.findall(r"```(?:json)?\s*(\{.*?\})\s*```", cleaned, re.DOTALL)
-    )
+    candidates.extend(re.findall(r"```(?:json)?\s*(\{.*?\})\s*```", cleaned, re.DOTALL))
 
     # Balanced braces scan.
     brace = 0
@@ -78,4 +76,3 @@ def robust_json_loads(text: str) -> Optional[Dict[str, Any]]:
             except Exception:
                 continue
     return None
-

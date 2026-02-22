@@ -5,8 +5,15 @@ from dataclasses import dataclass
 from typing import Any, Deque, Dict, List, Optional, Set, Tuple
 
 from .extractors import ClaimExtractor
-from .models import Claim, Evidence, FamilyRecord, MediaSpec, PersonRecord, PersonSpec, Task
-from .normalize import coerce_year, normalize_name
+from .models import (
+    Claim,
+    FamilyRecord,
+    MediaSpec,
+    PersonRecord,
+    PersonSpec,
+    Task,
+)
+from .normalize import coerce_year
 from .stores import GenealogyStore
 
 
@@ -44,12 +51,18 @@ def _person_spec_from_dict(d: Dict[str, Any]) -> PersonSpec:
         name=name,
         birth_date=d.get("birth_date") or d.get("birthDate"),
         death_date=d.get("death_date") or d.get("deathDate"),
-        birth_year=coerce_year(d.get("birth_year") or d.get("birthYear") or d.get("birth")),
-        death_year=coerce_year(d.get("death_year") or d.get("deathYear") or d.get("death")),
+        birth_year=coerce_year(
+            d.get("birth_year") or d.get("birthYear") or d.get("birth")
+        ),
+        death_year=coerce_year(
+            d.get("death_year") or d.get("deathYear") or d.get("death")
+        ),
         birth_place=d.get("birth_place") or d.get("birthPlace"),
         death_place=d.get("death_place") or d.get("deathPlace"),
         gender=d.get("gender") or d.get("sex"),
-        occupation=str(occupation).strip() if occupation is not None and str(occupation).strip() else None,
+        occupation=str(occupation).strip()
+        if occupation is not None and str(occupation).strip()
+        else None,
         biography=d.get("biography") or d.get("bio") or d.get("about"),
         aliases=aliases,
         extra={
@@ -123,9 +136,23 @@ class GenealogyPipeline:
             seen_tasks.add(key)
             q.append(t)
 
-        enqueue(Task(task_type=TASK_FIND_PARENTS, subject_kind="person", subject_id=seed_person_id, depth=0))
+        enqueue(
+            Task(
+                task_type=TASK_FIND_PARENTS,
+                subject_kind="person",
+                subject_id=seed_person_id,
+                depth=0,
+            )
+        )
         if self.config.enable_profile_search:
-            enqueue(Task(task_type=TASK_FIND_PROFILE, subject_kind="person", subject_id=seed_person_id, depth=0))
+            enqueue(
+                Task(
+                    task_type=TASK_FIND_PROFILE,
+                    subject_kind="person",
+                    subject_id=seed_person_id,
+                    depth=0,
+                )
+            )
 
         tasks_run = 0
         claims_written = 0
@@ -140,7 +167,10 @@ class GenealogyPipeline:
             if task.subject_kind == "family" and task.subject_id not in self.families:
                 continue
 
-            subject: Dict[str, Any] = {"subject_id": task.subject_id, "task_depth": task.depth}
+            subject: Dict[str, Any] = {
+                "subject_id": task.subject_id,
+                "task_depth": task.depth,
+            }
             if task.subject_kind == "person":
                 subject["person_id"] = task.subject_id
                 subject["person"] = self.people[task.subject_id].spec
@@ -148,7 +178,11 @@ class GenealogyPipeline:
                 fam = self.families[task.subject_id]
                 subject["family_id"] = fam.family_id
                 subject["family"] = fam
-                subject["parents"] = [self.people[pid].spec for pid in fam.parent_ids if pid in self.people]
+                subject["parents"] = [
+                    self.people[pid].spec
+                    for pid in fam.parent_ids
+                    if pid in self.people
+                ]
 
             claims = await self.extractor.extract(task.task_type, subject)
 
@@ -159,26 +193,101 @@ class GenealogyPipeline:
 
                 # Enqueue follow-ups.
                 if claim.claim_type == "parent_child":
-                    for parent_id, child_id, family_id in newly_discovered.get("parent_child", []):
+                    for parent_id, child_id, family_id in newly_discovered.get(
+                        "parent_child", []
+                    ):
                         if family_id:
-                            enqueue(Task(task_type=TASK_FIND_CHILDREN, subject_kind="family", subject_id=family_id, depth=task.depth))
+                            enqueue(
+                                Task(
+                                    task_type=TASK_FIND_CHILDREN,
+                                    subject_kind="family",
+                                    subject_id=family_id,
+                                    depth=task.depth,
+                                )
+                            )
                         # Expand ancestry.
-                        enqueue(Task(task_type=TASK_FIND_PARENTS, subject_kind="person", subject_id=parent_id, depth=task.depth + 1))
+                        enqueue(
+                            Task(
+                                task_type=TASK_FIND_PARENTS,
+                                subject_kind="person",
+                                subject_id=parent_id,
+                                depth=task.depth + 1,
+                            )
+                        )
                         if self.config.enable_profile_search:
-                            enqueue(Task(task_type=TASK_FIND_PROFILE, subject_kind="person", subject_id=parent_id, depth=task.depth + 1))
-                            enqueue(Task(task_type=TASK_FIND_PROFILE, subject_kind="person", subject_id=child_id, depth=task.depth + 1))
+                            enqueue(
+                                Task(
+                                    task_type=TASK_FIND_PROFILE,
+                                    subject_kind="person",
+                                    subject_id=parent_id,
+                                    depth=task.depth + 1,
+                                )
+                            )
+                            enqueue(
+                                Task(
+                                    task_type=TASK_FIND_PROFILE,
+                                    subject_kind="person",
+                                    subject_id=child_id,
+                                    depth=task.depth + 1,
+                                )
+                            )
                         # Expand descendants from siblings/children.
-                        if self.config.enable_descendant_expansion and self.config.enable_spouse_search:
-                            enqueue(Task(task_type=TASK_FIND_SPOUSES, subject_kind="person", subject_id=child_id, depth=task.depth + 1))
+                        if (
+                            self.config.enable_descendant_expansion
+                            and self.config.enable_spouse_search
+                        ):
+                            enqueue(
+                                Task(
+                                    task_type=TASK_FIND_SPOUSES,
+                                    subject_kind="person",
+                                    subject_id=child_id,
+                                    depth=task.depth + 1,
+                                )
+                            )
 
                 if claim.claim_type == "spouse":
-                    for (p1, p2, fam_id) in newly_discovered.get("spouse", []):
-                        enqueue(Task(task_type=TASK_FIND_CHILDREN, subject_kind="family", subject_id=fam_id, depth=task.depth + 1))
-                        enqueue(Task(task_type=TASK_FIND_PARENTS, subject_kind="person", subject_id=p1, depth=task.depth + 1))
-                        enqueue(Task(task_type=TASK_FIND_PARENTS, subject_kind="person", subject_id=p2, depth=task.depth + 1))
+                    for p1, p2, fam_id in newly_discovered.get("spouse", []):
+                        enqueue(
+                            Task(
+                                task_type=TASK_FIND_CHILDREN,
+                                subject_kind="family",
+                                subject_id=fam_id,
+                                depth=task.depth + 1,
+                            )
+                        )
+                        enqueue(
+                            Task(
+                                task_type=TASK_FIND_PARENTS,
+                                subject_kind="person",
+                                subject_id=p1,
+                                depth=task.depth + 1,
+                            )
+                        )
+                        enqueue(
+                            Task(
+                                task_type=TASK_FIND_PARENTS,
+                                subject_kind="person",
+                                subject_id=p2,
+                                depth=task.depth + 1,
+                            )
+                        )
                         if self.config.enable_profile_search:
-                            enqueue(Task(task_type=TASK_FIND_PROFILE, subject_kind="person", subject_id=p1, depth=task.depth + 1))
-                            enqueue(Task(task_type=TASK_FIND_PROFILE, subject_kind="person", subject_id=p2, depth=task.depth + 1))
+                            enqueue(
+                                Task(
+                                    task_type=TASK_FIND_PROFILE,
+                                    subject_kind="person",
+                                    subject_id=p1,
+                                    depth=task.depth + 1,
+                                )
+                            )
+                            enqueue(
+                                Task(
+                                    task_type=TASK_FIND_PROFILE,
+                                    subject_kind="person",
+                                    subject_id=p2,
+                                    depth=task.depth + 1,
+                                )
+                            )
 
         return {
             "tasks_run": tasks_run,
@@ -218,9 +327,15 @@ class GenealogyPipeline:
                 self.families[fam.family_id] = fam
                 family_id = fam.family_id
                 self.store.link_parents_to_family(fam.family_id, parent_ids)
-                self.store.link_child_to_family(fam.family_id, child_rec.person_id, props={"confidence": claim.confidence})
+                self.store.link_child_to_family(
+                    fam.family_id,
+                    child_rec.person_id,
+                    props={"confidence": claim.confidence},
+                )
 
-            claim_id = self.store.create_claim(claim.claim_type, claim.confidence, claim.data, notes=claim.notes)
+            claim_id = self.store.create_claim(
+                claim.claim_type, claim.confidence, claim.data, notes=claim.notes
+            )
             for ev in claim.evidence:
                 self.store.attach_evidence(claim_id, ev)
             # Link claim for provenance navigation.
@@ -246,11 +361,20 @@ class GenealogyPipeline:
             self.people[p1_rec.person_id] = p1_rec
             self.people[p2_rec.person_id] = p2_rec
 
-            fam = self.store.upsert_family([p1_rec.person_id, p2_rec.person_id], family_type="couple")
+            fam = self.store.upsert_family(
+                [p1_rec.person_id, p2_rec.person_id], family_type="couple"
+            )
             self.families[fam.family_id] = fam
-            self.store.link_spouses(fam.family_id, p1_rec.person_id, p2_rec.person_id, props={"confidence": claim.confidence})
+            self.store.link_spouses(
+                fam.family_id,
+                p1_rec.person_id,
+                p2_rec.person_id,
+                props={"confidence": claim.confidence},
+            )
 
-            claim_id = self.store.create_claim(claim.claim_type, claim.confidence, claim.data, notes=claim.notes)
+            claim_id = self.store.create_claim(
+                claim.claim_type, claim.confidence, claim.data, notes=claim.notes
+            )
             for ev in claim.evidence:
                 self.store.attach_evidence(claim_id, ev)
             self.store.link_claim_to_person(claim_id, p1_rec.person_id, role="spouse")
@@ -289,23 +413,35 @@ class GenealogyPipeline:
                             kind=kind,
                             path=path,
                             caption=m.get("caption"),
-                            extra={k: v for k, v in m.items() if k not in {"kind", "path", "img_path", "caption"}},
+                            extra={
+                                k: v
+                                for k, v in m.items()
+                                if k not in {"kind", "path", "img_path", "caption"}
+                            },
                         )
                     )
 
             # Update canonical store.
             self.store.update_person(person_id, spec)
             if existing:
-                self.people[person_id] = PersonRecord(person_id=person_id, spec=spec, normalized_name=existing.normalized_name)
+                self.people[person_id] = PersonRecord(
+                    person_id=person_id,
+                    spec=spec,
+                    normalized_name=existing.normalized_name,
+                )
 
-            claim_id = self.store.create_claim(claim.claim_type, claim.confidence, claim.data, notes=claim.notes)
+            claim_id = self.store.create_claim(
+                claim.claim_type, claim.confidence, claim.data, notes=claim.notes
+            )
             for ev in claim.evidence:
                 self.store.attach_evidence(claim_id, ev)
             self.store.link_claim_to_person(claim_id, person_id, role="profile")
 
             for ms in media_specs:
                 media_id = self.store.upsert_media(ms)
-                self.store.link_person_media(person_id, media_id, props={"confidence": claim.confidence})
+                self.store.link_person_media(
+                    person_id, media_id, props={"confidence": claim.confidence}
+                )
                 self.store.link_claim_to_media(claim_id, media_id, role="mentions")
 
             wrote = True

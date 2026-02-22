@@ -17,7 +17,7 @@ import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from dotenv import load_dotenv
 
@@ -93,7 +93,9 @@ def _resolve_content_list_path(input_path: Path) -> Path:
     return candidates[0]
 
 
-def _load_pages(content_list_path: Path, max_pages: Optional[int] = None) -> Tuple[List[PageItem], str]:
+def _load_pages(
+    content_list_path: Path, max_pages: Optional[int] = None
+) -> Tuple[List[PageItem], str]:
     obj = json.loads(content_list_path.read_text(encoding="utf-8"))
     if not isinstance(obj, list):
         raise TypeError(f"content_list must be a list, got: {type(obj)}")
@@ -141,7 +143,9 @@ def _write_stage1_artifacts(output_dir: Path, pages: Sequence[PageItem]) -> None
 
     with pages_jsonl.open("w", encoding="utf-8") as f:
         for p in pages:
-            f.write(json.dumps({"page_idx": p.page_idx, "text": p.text}, ensure_ascii=False))
+            f.write(
+                json.dumps({"page_idx": p.page_idx, "text": p.text}, ensure_ascii=False)
+            )
             f.write("\n")
 
     with book_txt.open("w", encoding="utf-8") as f:
@@ -173,7 +177,9 @@ def _chunk_pages(
             return
         chunk_id = len(chunks)
         text = "\n\n".join(cur_texts).strip()
-        chunks.append(ChunkItem(chunk_id=chunk_id, page_indices=list(cur_pages), text=text))
+        chunks.append(
+            ChunkItem(chunk_id=chunk_id, page_indices=list(cur_pages), text=text)
+        )
         cur_pages = []
         cur_texts = []
         cur_len = 0
@@ -183,7 +189,9 @@ def _chunk_pages(
         if not piece.strip():
             continue
         projected_len = cur_len + len(piece) + 2
-        if cur_pages and (len(cur_pages) >= pages_per_chunk or projected_len > max_chars):
+        if cur_pages and (
+            len(cur_pages) >= pages_per_chunk or projected_len > max_chars
+        ):
             flush()
             if max_chunks is not None and len(chunks) >= max_chunks:
                 break
@@ -239,7 +247,9 @@ def _is_valid_person_name(name: str) -> bool:
     return True
 
 
-def _extract_evidence(rel: Dict[str, Any], fallback_page: Optional[int]) -> Dict[str, Any]:
+def _extract_evidence(
+    rel: Dict[str, Any], fallback_page: Optional[int]
+) -> Dict[str, Any]:
     quote: Optional[str] = None
     page_idx: Optional[int] = None
     evidence_obj = rel.get("evidence")
@@ -279,7 +289,9 @@ def _canonical_relation_type(v: Any) -> Optional[str]:
     return None
 
 
-def _parse_parent_child_relation(rel: Dict[str, Any]) -> Tuple[List[str], Optional[str]]:
+def _parse_parent_child_relation(
+    rel: Dict[str, Any],
+) -> Tuple[List[str], Optional[str]]:
     parents: List[str] = []
     child: Optional[str] = None
 
@@ -300,7 +312,11 @@ def _parse_parent_child_relation(rel: Dict[str, Any]) -> Tuple[List[str], Option
 
     child = _extract_name(rel.get("child"))
     if not child:
-        child = _extract_name(rel.get("person2")) if str(rel.get("direction", "")).lower() == "parent_to_child" else child
+        child = (
+            _extract_name(rel.get("person2"))
+            if str(rel.get("direction", "")).lower() == "parent_to_child"
+            else child
+        )
 
     deduped: List[str] = []
     seen = set()
@@ -316,28 +332,49 @@ def _parse_parent_child_relation(rel: Dict[str, Any]) -> Tuple[List[str], Option
 
 
 def _parse_spouse_relation(rel: Dict[str, Any]) -> Tuple[Optional[str], Optional[str]]:
-    p1 = _extract_name(rel.get("person1")) or _extract_name(rel.get("spouse1")) or _extract_name(rel.get("a"))
-    p2 = _extract_name(rel.get("person2")) or _extract_name(rel.get("spouse2")) or _extract_name(rel.get("b"))
+    p1 = (
+        _extract_name(rel.get("person1"))
+        or _extract_name(rel.get("spouse1"))
+        or _extract_name(rel.get("a"))
+    )
+    p2 = (
+        _extract_name(rel.get("person2"))
+        or _extract_name(rel.get("spouse2"))
+        or _extract_name(rel.get("b"))
+    )
     if not p1 and isinstance(rel.get("people"), list):
         people = rel.get("people") or []
         if len(people) >= 2:
             p1 = _extract_name(people[0])
             p2 = _extract_name(people[1])
-    return (_normalize_name_surface(p1) if p1 else None, _normalize_name_surface(p2) if p2 else None)
+    return (
+        _normalize_name_surface(p1) if p1 else None,
+        _normalize_name_surface(p2) if p2 else None,
+    )
 
 
 def _merge_person(existing: Dict[str, Any], incoming: Dict[str, Any]) -> Dict[str, Any]:
     out = dict(existing)
     if len(str(incoming.get("name") or "")) > len(str(out.get("name") or "")):
         out["name"] = incoming.get("name")
-    for key in ("birth_date", "death_date", "birth_place", "death_place", "gender", "occupation", "biography"):
+    for key in (
+        "birth_date",
+        "death_date",
+        "birth_place",
+        "death_place",
+        "gender",
+        "occupation",
+        "biography",
+    ):
         if not out.get(key) and incoming.get(key):
             out[key] = incoming[key]
     if not out.get("birth_year"):
         out["birth_year"] = incoming.get("birth_year")
     if not out.get("death_year"):
         out["death_year"] = incoming.get("death_year")
-    out["confidence"] = max(float(out.get("confidence") or 0.0), float(incoming.get("confidence") or 0.0))
+    out["confidence"] = max(
+        float(out.get("confidence") or 0.0), float(incoming.get("confidence") or 0.0)
+    )
     aliases = set(out.get("aliases") or [])
     aliases.update(incoming.get("aliases") or [])
     aliases.discard(out.get("name"))
@@ -514,19 +551,33 @@ def _parse_extracted_chunk(chunk: ChunkItem, payload: Dict[str, Any]) -> Dict[st
             aliases_val = p.get("aliases") or []
             aliases: List[str]
             if isinstance(aliases_val, list):
-                aliases = [_normalize_name_surface(str(a)) for a in aliases_val if str(a).strip()]
+                aliases = [
+                    _normalize_name_surface(str(a))
+                    for a in aliases_val
+                    if str(a).strip()
+                ]
             elif isinstance(aliases_val, str):
-                aliases = [_normalize_name_surface(x) for x in aliases_val.split(",") if x.strip()]
+                aliases = [
+                    _normalize_name_surface(x)
+                    for x in aliases_val.split(",")
+                    if x.strip()
+                ]
             else:
                 aliases = []
             parsed_people.append(
                 {
                     "name": name,
-                    "aliases": sorted(set(a for a in aliases if _is_valid_person_name(a))),
+                    "aliases": sorted(
+                        set(a for a in aliases if _is_valid_person_name(a))
+                    ),
                     "birth_date": p.get("birth_date"),
                     "death_date": p.get("death_date"),
-                    "birth_year": coerce_year(p.get("birth_year") or p.get("birth_date")),
-                    "death_year": coerce_year(p.get("death_year") or p.get("death_date")),
+                    "birth_year": coerce_year(
+                        p.get("birth_year") or p.get("birth_date")
+                    ),
+                    "death_year": coerce_year(
+                        p.get("death_year") or p.get("death_date")
+                    ),
                     "birth_place": p.get("birth_place"),
                     "death_place": p.get("death_place"),
                     "gender": p.get("gender"),
@@ -541,7 +592,9 @@ def _parse_extracted_chunk(chunk: ChunkItem, payload: Dict[str, Any]) -> Dict[st
         for rel in relations_raw:
             if not isinstance(rel, dict):
                 continue
-            rtype = _canonical_relation_type(rel.get("type") or rel.get("relation_type"))
+            rtype = _canonical_relation_type(
+                rel.get("type") or rel.get("relation_type")
+            )
             if not rtype:
                 continue
             confidence = _safe_float(rel.get("confidence"), 0.5)
@@ -620,8 +673,12 @@ def _build_knowledge_graph(
             "aliases": person.get("aliases") or [],
             "birth_date": person.get("birth_date"),
             "death_date": person.get("death_date"),
-            "birth_year": coerce_year(person.get("birth_year") or person.get("birth_date")),
-            "death_year": coerce_year(person.get("death_year") or person.get("death_date")),
+            "birth_year": coerce_year(
+                person.get("birth_year") or person.get("birth_date")
+            ),
+            "death_year": coerce_year(
+                person.get("death_year") or person.get("death_date")
+            ),
             "birth_place": person.get("birth_place"),
             "death_place": person.get("death_place"),
             "gender": person.get("gender"),
@@ -651,12 +708,19 @@ def _build_knowledge_graph(
                 a, b = sorted([p1_key, p2_key])
                 edge = spouse_rel.setdefault(
                     (a, b),
-                    {"person1_key": a, "person2_key": b, "confidence": conf, "evidence": []},
+                    {
+                        "person1_key": a,
+                        "person2_key": b,
+                        "confidence": conf,
+                        "evidence": [],
+                    },
                 )
                 edge["confidence"] = max(edge["confidence"], conf)
                 _append_evidence(edge["evidence"], rel.get("evidence") or {})
             elif rel.get("type") == "parent_child":
-                child_key = upsert_person({"name": rel.get("child"), "confidence": conf})
+                child_key = upsert_person(
+                    {"name": rel.get("child"), "confidence": conf}
+                )
                 parents = rel.get("parents") or []
                 parent_keys: List[str] = []
                 for p_name in parents[:2]:
@@ -686,24 +750,36 @@ def _build_knowledge_graph(
                     _append_evidence(edge["evidence"], rel.get("evidence") or {})
 
     connected = set()
-    for (a, b) in spouse_rel:
+    for a, b in spouse_rel:
         connected.add(a)
         connected.add(b)
-    for (p, c) in parent_child_rel:
+    for p, c in parent_child_rel:
         connected.add(p)
         connected.add(c)
 
     filtered_people = {k: v for k, v in people.items() if k in connected}
-    filtered_spouse = {k: v for k, v in spouse_rel.items() if k[0] in filtered_people and k[1] in filtered_people}
+    filtered_spouse = {
+        k: v
+        for k, v in spouse_rel.items()
+        if k[0] in filtered_people and k[1] in filtered_people
+    }
     filtered_parent_child = {
-        k: v for k, v in parent_child_rel.items() if k[0] in filtered_people and k[1] in filtered_people
+        k: v
+        for k, v in parent_child_rel.items()
+        if k[0] in filtered_people and k[1] in filtered_people
     }
 
     return {
         "people": sorted(filtered_people.values(), key=lambda x: x["name"]),
         "relations": {
-            "spouse": sorted(filtered_spouse.values(), key=lambda x: (x["person1_key"], x["person2_key"])),
-            "parent_child": sorted(filtered_parent_child.values(), key=lambda x: (x["parent_key"], x["child_key"])),
+            "spouse": sorted(
+                filtered_spouse.values(),
+                key=lambda x: (x["person1_key"], x["person2_key"]),
+            ),
+            "parent_child": sorted(
+                filtered_parent_child.values(),
+                key=lambda x: (x["parent_key"], x["child_key"]),
+            ),
         },
     }
 
@@ -747,7 +823,9 @@ def _build_family_tree(kg: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _reset_neo4j(uri: str, username: str, password: str, database: Optional[str]) -> None:
+def _reset_neo4j(
+    uri: str, username: str, password: str, database: Optional[str]
+) -> None:
     from neo4j import GraphDatabase  # type: ignore
 
     driver = GraphDatabase.driver(uri, auth=(username, password))
@@ -811,7 +889,9 @@ def _persist_family_tree(
             id1 = person_id_map[k1]
             id2 = person_id_map[k2]
             fam = store.upsert_family([id1, id2], family_type="couple")
-            store.link_spouses(fam.family_id, id1, id2, props={"confidence": rel.get("confidence")})
+            store.link_spouses(
+                fam.family_id, id1, id2, props={"confidence": rel.get("confidence")}
+            )
             claim_id = store.create_claim(
                 "spouse",
                 float(rel.get("confidence") or 0.0),
@@ -851,7 +931,9 @@ def _persist_family_tree(
                 fam = store.upsert_family(parent_ids[:2], family_type="parents")
                 family_id = fam.family_id
                 store.link_parents_to_family(fam.family_id, parent_ids[:2])
-                store.link_child_to_family(fam.family_id, child_id, props={"confidence": rel.get("confidence")})
+                store.link_child_to_family(
+                    fam.family_id, child_id, props={"confidence": rel.get("confidence")}
+                )
             else:
                 pid = parent_ids[0]
                 if pid not in single_parent_family:
@@ -859,7 +941,9 @@ def _persist_family_tree(
                     single_parent_family[pid] = fam.family_id
                     store.link_parents_to_family(fam.family_id, [pid])
                 family_id = single_parent_family[pid]
-                store.link_child_to_family(family_id, child_id, props={"confidence": rel.get("confidence")})
+                store.link_child_to_family(
+                    family_id, child_id, props={"confidence": rel.get("confidence")}
+                )
 
             claim_data = {
                 "parents": [{"name": pk}] + ([{"name": opk}] if opk else []),
@@ -909,7 +993,9 @@ def _serialize_for_json(data: Any) -> Any:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="Family-tree extraction pipeline from content_list")
+    p = argparse.ArgumentParser(
+        description="Family-tree extraction pipeline from content_list"
+    )
     p.add_argument(
         "--input",
         required=True,
@@ -927,14 +1013,21 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--min-relation-confidence", type=float, default=0.35)
 
     p.add_argument("--model", default=os.getenv("LLM_MODEL", "qwen2.5:32b"))
-    p.add_argument("--llm-base-url", default=os.getenv("LLM_BINDING_HOST", "http://localhost:11434/v1"))
+    p.add_argument(
+        "--llm-base-url",
+        default=os.getenv("LLM_BINDING_HOST", "http://localhost:11434/v1"),
+    )
     p.add_argument("--llm-api-key", default=os.getenv("LLM_BINDING_API_KEY", "ollama"))
     p.add_argument("--llm-timeout", type=int, default=300)
     p.add_argument("--llm-max-tokens", type=int, default=1600)
 
     p.add_argument("--dry-run", action="store_true", help="Skip writing to Neo4j")
-    p.add_argument("--reset-neo4j", action="store_true", help="Clear Neo4j before writing results")
-    p.add_argument("--neo4j-uri", default=os.getenv("NEO4J_URI", "bolt://localhost:7687"))
+    p.add_argument(
+        "--reset-neo4j", action="store_true", help="Clear Neo4j before writing results"
+    )
+    p.add_argument(
+        "--neo4j-uri", default=os.getenv("NEO4J_URI", "bolt://localhost:7687")
+    )
     p.add_argument("--neo4j-user", default=os.getenv("NEO4J_USERNAME", "neo4j"))
     p.add_argument("--neo4j-password", default=os.getenv("NEO4J_PASSWORD", "neo4j"))
     p.add_argument("--neo4j-db", default=os.getenv("NEO4J_DATABASE", None))
@@ -945,7 +1038,11 @@ async def _run(args: argparse.Namespace) -> int:
     input_path = Path(args.input).expanduser().resolve()
     content_list_path = _resolve_content_list_path(input_path)
 
-    out_dir = Path(args.output_dir) if args.output_dir else Path(f"./output_family_tree/run_{_now_ts()}")
+    out_dir = (
+        Path(args.output_dir)
+        if args.output_dir
+        else Path(f"./output_family_tree/run_{_now_ts()}")
+    )
     out_dir = out_dir.expanduser().resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1031,7 +1128,9 @@ async def _run(args: argparse.Namespace) -> int:
         "pages": len(pages),
         "chunks": len(chunks),
         "parsed_people_total": sum(len(c.get("people") or []) for c in parsed_chunks),
-        "parsed_relations_total": sum(len(c.get("relations") or []) for c in parsed_chunks),
+        "parsed_relations_total": sum(
+            len(c.get("relations") or []) for c in parsed_chunks
+        ),
         "kg_people": len(kg.get("people") or []),
         "kg_parent_child": len(kg.get("relations", {}).get("parent_child") or []),
         "kg_spouse": len(kg.get("relations", {}).get("spouse") or []),
@@ -1058,4 +1157,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

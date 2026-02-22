@@ -47,4 +47,3 @@ def coerce_year(value: object) -> Optional[int]:
         return int(token) if token else None
     except Exception:
         return None
-

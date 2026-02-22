@@ -9,20 +9,25 @@ This script integrates:
 
 import os
 from typing import Dict, Any, Optional, Callable
-import sys
 import asyncio
 import atexit
 from dataclasses import dataclass, field
-from pathlib import Path
 from dotenv import load_dotenv
 
-# Add project root directory to Python path
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Load environment variables from .env file BEFORE importing LightRAG
 # This is critical for TIKTOKEN_CACHE_DIR to work properly in offline environments
 # The OS environment variables take precedence over the .env file
-load_dotenv(dotenv_path=".env", override=False)
+def _load_dotenv_if_enabled() -> None:
+    should_load = os.getenv("RAGANYTHING_LOAD_DOTENV", "1").strip().lower()
+    if should_load in {"0", "false", "no", "off"}:
+        return
+
+    dotenv_path = os.getenv("RAGANYTHING_DOTENV_PATH", ".env")
+    load_dotenv(dotenv_path=dotenv_path, override=False)
+
+
+_load_dotenv_if_enabled()
 
 from lightrag import LightRAG
 from lightrag.utils import logger
