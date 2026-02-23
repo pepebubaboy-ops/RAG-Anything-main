@@ -12,7 +12,13 @@ from typing import Dict, Any, Optional, Callable
 import asyncio
 import atexit
 from dataclasses import dataclass, field
-from dotenv import load_dotenv
+
+from .offline import configure_offline_environment, is_offline_mode
+
+try:
+    from dotenv import load_dotenv
+except ModuleNotFoundError:  # pragma: no cover - depends on optional extra
+    load_dotenv = None
 
 
 # Load environment variables from .env file BEFORE importing LightRAG
@@ -23,10 +29,17 @@ def _load_dotenv_if_enabled() -> None:
     if should_load in {"0", "false", "no", "off"}:
         return
 
+    if load_dotenv is None:
+        raise RuntimeError(
+            "python-dotenv is not installed. "
+            "Install extras: pip install 'raganything[dotenv]'"
+        )
+
     dotenv_path = os.getenv("RAGANYTHING_DOTENV_PATH", ".env")
     load_dotenv(dotenv_path=dotenv_path, override=False)
 
 
+configure_offline_environment()
 _load_dotenv_if_enabled()
 
 from lightrag import LightRAG
@@ -103,6 +116,12 @@ class RAGAnything(QueryMixin, ProcessorMixin, BatchMixin):
 
     def __post_init__(self):
         """Post-initialization setup following LightRAG pattern"""
+        if is_offline_mode() and not os.getenv("TIKTOKEN_CACHE_DIR"):
+            raise RuntimeError(
+                "RAGANYTHING_OFFLINE=1 requires a local TIKTOKEN cache. "
+                "Set TIKTOKEN_CACHE_DIR to an existing local cache directory."
+            )
+
         # Initialize configuration if not provided
         if self.config is None:
             self.config = RAGAnythingConfig()

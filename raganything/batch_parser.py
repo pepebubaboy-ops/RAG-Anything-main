@@ -15,7 +15,25 @@ from functools import partial
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from tqdm import tqdm
+try:
+    from tqdm import tqdm
+except ModuleNotFoundError:  # pragma: no cover - depends on optional extra
+
+    class _NoOpProgressBar:
+        def __init__(self, total: int, desc: str = "", unit: str = "file"):
+            self.total = total
+            self.desc = desc
+            self.unit = unit
+
+        def update(self, n: int = 1) -> None:
+            return None
+
+        def close(self) -> None:
+            return None
+
+    def tqdm(*args, **kwargs):
+        return _NoOpProgressBar(*args, **kwargs)
+
 
 from .parser import MineruParser, DoclingParser
 

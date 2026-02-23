@@ -8,7 +8,7 @@ dynamic = ["version"]
 authors = [
     {name = "Zirui Guo"}
 ]
-description = "RAGAnything: All-in-One RAG System"
+description = "RAGAnything: lightweight offline-first genealogy and optional multimodal RAG toolkit"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
@@ -20,16 +20,26 @@ classifiers = [
     "Intended Audience :: Developers",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-dependencies = [
-    "huggingface_hub",
-    "lightrag-hku",
-    "mineru[core]",
-    "tqdm",
-]
+dependencies = []
+
+[project.scripts]
+raganything = "raganything.cli:main"
 
 [project.optional-dependencies]
-image = ["Pillow>=10.0.0"]
-text = ["reportlab>=4.0.0"]
+rag = [
+    "huggingface_hub",
+    "lightrag-hku",
+    "tqdm",
+]
+mineru = ["mineru[core]"]
+neo4j = ["neo4j>=5.0.0"]
+dotenv = ["python-dotenv>=1.0.0"]
+image = [
+    "Pillow>=10.0.0",
+]
+text = [
+    "reportlab>=4.0.0",
+]
 office = []  # Requires LibreOffice (external program)
 markdown = [
     "markdown>=3.4.0",
@@ -37,11 +47,17 @@ markdown = [
     "pygments>=2.10.0",
 ]
 all = [
+    "huggingface_hub",
+    "lightrag-hku",
+    "tqdm",
+    "mineru[core]",
+    "neo4j>=5.0.0",
+    "python-dotenv>=1.0.0",
     "Pillow>=10.0.0",
     "reportlab>=4.0.0",
     "markdown>=3.4.0",
     "weasyprint>=60.0",
-    "pygments>=2.10.0"
+    "pygments>=2.10.0",
 ]
 
 [project.urls]
