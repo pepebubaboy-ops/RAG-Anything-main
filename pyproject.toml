@@ -33,7 +33,7 @@ rag = [
 ]
 mineru = ["mineru[core]"]
 neo4j = ["neo4j>=5.0.0"]
-dotenv = ["python-dotenv>=1.0.0"]
+dotenv = ["python-dotenv>=1.2.2"]
 image = [
     "Pillow>=10.0.0",
 ]
@@ -52,7 +52,7 @@ all = [
     "tqdm",
     "mineru[core]",
     "neo4j>=5.0.0",
-    "python-dotenv>=1.0.0",
+    "python-dotenv>=1.2.2",
     "Pillow>=10.0.0",
     "reportlab>=4.0.0",
     "markdown>=3.4.0",
