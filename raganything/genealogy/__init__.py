@@ -1,4 +1,9 @@
-"""Local-first genealogy extraction, validation, graph, and retrieval helpers."""
+"""Local-first genealogy extraction helpers.
+
+This package contains source chunk handling, claim extraction, evidence validation,
+graph construction, retrieval context helpers, and export utilities for private
+family-history books.
+"""
 
 from .models import (
     Claim,
