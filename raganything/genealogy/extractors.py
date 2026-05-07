@@ -10,9 +10,8 @@ from .models import Claim
 class ClaimExtractor(ABC):
     """Extract structured claims for a task.
 
-    Production extractors typically:
-    - retrieve local source context
-    - run an LLM pass to output strict JSON claims
+    Production extractors typically retrieve local evidence and run an LLM pass
+    to output strict JSON claims.
     """
 
     @abstractmethod
