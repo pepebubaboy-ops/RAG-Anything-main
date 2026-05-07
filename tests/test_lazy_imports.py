@@ -11,21 +11,17 @@ def _clear_raganything_modules() -> None:
             sys.modules.pop(name, None)
 
 
-def test_import_genealogy_does_not_force_heavy_modules() -> None:
-    had_mineru = "mineru" in sys.modules
-    had_neo4j = "neo4j" in sys.modules
-    had_openai = "openai" in sys.modules
+def test_import_genealogy_does_not_force_optional_modules() -> None:
+    optional_modules = ("mineru", "openai", "neo4j")
+    was_loaded = {name: name in sys.modules for name in optional_modules}
 
     _clear_raganything_modules()
 
     importlib.import_module("raganything.genealogy")
 
-    if not had_mineru:
-        assert "mineru" not in sys.modules
-    if not had_neo4j:
-        assert "neo4j" not in sys.modules
-    if not had_openai:
-        assert "openai" not in sys.modules
+    for name, already_loaded in was_loaded.items():
+        if not already_loaded:
+            assert name not in sys.modules
 
 
 def test_import_raganything_and_genealogy_in_subprocess() -> None:
