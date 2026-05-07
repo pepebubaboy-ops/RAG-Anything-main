@@ -1,10 +1,9 @@
 import pytest
 
 from raganything.genealogy.extractors import ClaimExtractor
-from raganything.genealogy.models import Claim, Evidence
+from raganything.genealogy.models import Claim, Evidence, PersonSpec
 from raganything.genealogy.pipeline import GenealogyPipeline, GenealogyPipelineConfig
 from raganything.genealogy.stores import InMemoryGenealogyStore
-from raganything.genealogy.models import PersonSpec
 
 
 class ToyExtractor(ClaimExtractor):

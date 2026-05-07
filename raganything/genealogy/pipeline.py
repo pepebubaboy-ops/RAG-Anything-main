@@ -16,7 +16,6 @@ from .models import (
 from .normalize import coerce_year
 from .stores import GenealogyStore
 
-
 TASK_FIND_PARENTS = "find_parents"
 TASK_FIND_CHILDREN = "find_children"
 TASK_FIND_SPOUSES = "find_spouses"

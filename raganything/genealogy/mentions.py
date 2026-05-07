@@ -10,7 +10,6 @@ from .claim_extraction import _clean_name_with_years
 from .normalize import normalize_name
 from .rag_index import write_jsonl
 
-
 _MENTION_TOKEN_PATTERN = r"[A-ZА-ЯЁ][A-Za-zА-Яа-яЁё0-9'’\-]*"
 _MENTION_CORE_PATTERN = (
     rf"{_MENTION_TOKEN_PATTERN}(?:\s+{_MENTION_TOKEN_PATTERN}){{0,3}}"

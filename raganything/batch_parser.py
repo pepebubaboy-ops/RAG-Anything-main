@@ -35,7 +35,7 @@ except ModuleNotFoundError:  # pragma: no cover - depends on optional extra
         return _NoOpProgressBar(*args, **kwargs)
 
 
-from .parser import MineruParser, DoclingParser
+from .parser import DoclingParser, MineruParser
 
 
 @dataclass
