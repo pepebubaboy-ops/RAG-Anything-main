@@ -11,25 +11,24 @@ For Office documents (.doc, .docx, .ppt, .pptx), please convert them to PDF form
 
 from __future__ import annotations
 
-
-import json
 import argparse
 import base64
+import json
+import logging
 import shutil
 import subprocess
 import sys
 import tempfile
-import logging
 import time
 from pathlib import Path
 from typing import (
+    Any,
     Dict,
     List,
     Optional,
-    Union,
     Tuple,
-    Any,
     TypeVar,
+    Union,
 )
 
 T = TypeVar("T")
@@ -264,11 +263,11 @@ class Parser:
 
             try:
                 from reportlab.lib.pagesizes import A4
-                from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-                from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+                from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
                 from reportlab.lib.units import inch
                 from reportlab.pdfbase import pdfmetrics
                 from reportlab.pdfbase.ttfonts import TTFont
+                from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 
                 support_chinese = True
                 try:

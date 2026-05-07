@@ -1,43 +1,36 @@
-# Python
 __pycache__/
 *.py[cod]
 *.egg-info/
 .eggs/
-.python-version
 
-# Virtual environments
 .venv/
 .venv*/
 env/
 venv/
 
-# Build and test caches
 dist/
 build/
 site/
+
 .cache/
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
-.coverage
-.coverage.*
-htmlcov/
 
-# Local secrets and editor files
-*.env*
-!.env.example
-.DS_Store
 .idea/
 .vscode/
-.vscode/settings.json
+.DS_Store
 
-# Local/private genealogy inputs and outputs
+.env
+.env.*
+!env.example
+
 /inputs/
 /outputs/
 /output*/
 /**/_parsed_pdf/
+/rag_storage*/
 
-# Books, scans, archives, and rendered media
 *.pdf
 *.tif
 *.tiff
@@ -46,34 +39,8 @@ htmlcov/
 *.png
 *.zip
 
-# Generated genealogy/RAG artifacts
-/**/llm_extraction_raw.jsonl
-/**/claims.jsonl
-/**/source_chunks.jsonl
-/**/people.json
-/**/relationships.json
-/**/tree.html
-/**/tree.dot
-/**/candidate_chunks.jsonl
-/**/llm_claim_candidates.jsonl
-/**/rag_documents.jsonl
-/**/mentions.jsonl
-/**/evidences.jsonl
-/**/families.json
-/**/sources.json
-/**/conflicts.json
-/**/person_resolution.json
-
-# Keep test fixtures trackable.
-!/tests/fixtures/
-!/tests/fixtures/**
-
-# Logs
 *.log
-*.log.*
-log/
-
-# Miscellaneous local files
-TODO.md
-ignore_this.txt
-*.ignore.*
+*.coverage
+.coverage
+.coverage.*
+htmlcov/

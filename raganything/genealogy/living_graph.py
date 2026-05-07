@@ -13,7 +13,6 @@ from .export import escape_dot as _escape_dot
 from .export import try_generate_svg_from_dot as _try_generate_svg_from_dot
 from .results import BuildResult
 
-
 _PARENT_RELATION_TYPES = {"parent_child", "parent_of", "father_of", "mother_of"}
 _WEAK_PARENT_CANDIDATE_TYPES = {"relative", "associated_with", "knows"}
 _PARENT_PROMOTION_MIN_CONFIDENCE = 0.75

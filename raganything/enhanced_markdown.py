@@ -10,13 +10,13 @@ This module provides improved Markdown to PDF conversion with:
 - Multiple output formats
 """
 
-import os
 import logging
-from pathlib import Path
-from typing import Dict, Any, Optional
-from dataclasses import dataclass
-import tempfile
+import os
 import subprocess
+import tempfile
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 try:
     import markdown

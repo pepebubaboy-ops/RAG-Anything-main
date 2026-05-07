@@ -9,7 +9,6 @@ from typing import Any, Dict, List, Sequence, Tuple
 from .normalize import normalize_name
 from .rag_index import write_jsonl
 
-
 PARENT_MIN_AGE_GAP = 12
 PARENT_MAX_AGE_GAP = 80
 

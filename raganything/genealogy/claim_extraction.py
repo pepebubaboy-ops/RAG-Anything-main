@@ -5,7 +5,6 @@ from typing import Any, Dict, Iterable, Iterator, Tuple
 
 from .models import Claim, Evidence
 
-
 _NAME_CORE_PATTERN = (
     r"[A-ZА-ЯЁ][A-Za-zА-Яа-яЁё'’\-]*(?:\s+[A-ZА-ЯЁ][A-Za-zА-Яа-яЁё'’\-]*){0,3}"
 )

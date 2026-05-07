@@ -13,8 +13,8 @@ from raganything.genealogy.llm_claim_extraction import (
     run_llm_claim_pipeline,
 )
 from raganything.genealogy.mentions import extract_mentions_from_text
-from raganything.genealogy.rag_index import read_jsonl
 from raganything.genealogy.query_resolution import resolve_genealogy_query
+from raganything.genealogy.rag_index import read_jsonl
 from raganything.genealogy.retrieval import (
     build_genealogy_answer_prompt,
     retrieve_genealogy_context,

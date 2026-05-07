@@ -377,7 +377,7 @@ class Neo4jGenealogyStore(GenealogyStore):
     """Neo4j-backed canonical store.
 
     This uses the official neo4j Python driver (sync). Install with:
-      pip install 'genealogy-rag-core[neo4j]'
+      uv add --dev neo4j
     """
 
     def __init__(
@@ -387,8 +387,7 @@ class Neo4jGenealogyStore(GenealogyStore):
             from neo4j import GraphDatabase  # type: ignore
         except Exception as e:
             raise RuntimeError(
-                "neo4j Python driver is not installed. "
-                "Install with: pip install 'genealogy-rag-core[neo4j]'"
+                "neo4j Python driver is not installed. Install with: uv add --dev neo4j"
             ) from e
 
         self._GraphDatabase = GraphDatabase
