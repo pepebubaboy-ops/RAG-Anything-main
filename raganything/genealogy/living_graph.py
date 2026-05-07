@@ -157,7 +157,6 @@ _MERGE_DECORATOR_TOKENS = {
 _MERGE_KEEP_ROLES = {"father", "mother", "parent"}
 
 
-
 def _looks_like_living_graph_json(path: Path) -> bool:
     if path.suffix.lower() != ".json":
         return False
@@ -409,7 +408,9 @@ def _token_similarity(left: str, right: str) -> float:
     return SequenceMatcher(None, left, right).ratio()
 
 
-def _segment_mentions_name_token(segment_tokens: Sequence[str], name_token: str) -> bool:
+def _segment_mentions_name_token(
+    segment_tokens: Sequence[str], name_token: str
+) -> bool:
     if not segment_tokens or not name_token:
         return False
     normalized_name = _name_token_root(name_token)
@@ -473,12 +474,20 @@ def _genders_compatible_for_merge(left: Dict[str, Any], right: Dict[str, Any]) -
 def _years_compatible_for_merge(left: Dict[str, Any], right: Dict[str, Any]) -> bool:
     left_birth = _coerce_year(left.get("birth_year"))
     right_birth = _coerce_year(right.get("birth_year"))
-    if left_birth is not None and right_birth is not None and abs(left_birth - right_birth) > 15:
+    if (
+        left_birth is not None
+        and right_birth is not None
+        and abs(left_birth - right_birth) > 15
+    ):
         return False
 
     left_death = _coerce_year(left.get("death_year"))
     right_death = _coerce_year(right.get("death_year"))
-    if left_death is not None and right_death is not None and abs(left_death - right_death) > 15:
+    if (
+        left_death is not None
+        and right_death is not None
+        and abs(left_death - right_death) > 15
+    ):
         return False
     return True
 
@@ -593,7 +602,9 @@ def _entities_should_merge(
     left_id = str(left.get("entity_id") or "")
     right_id = str(right.get("entity_id") or "")
     pair_link = pair_links.get(tuple(sorted((left_id, right_id))))
-    pair_relation_types = set(pair_link.get("relation_types") or set()) if pair_link else set()
+    pair_relation_types = (
+        set(pair_link.get("relation_types") or set()) if pair_link else set()
+    )
     if pair_relation_types & _DIRECT_GENEALOGICAL_RELATION_TYPES:
         return False
     merge_anchor = _pair_has_merge_anchor(pair_link)
@@ -601,7 +612,10 @@ def _entities_should_merge(
     right_neighbors = neighbor_index.get(right_id, set())
     has_neighbor_overlap = bool(left_neighbors & right_neighbors)
 
-    if left_features["first_token"] and left_features["first_token"] == right_features["first_token"]:
+    if (
+        left_features["first_token"]
+        and left_features["first_token"] == right_features["first_token"]
+    ):
         left_birth = _coerce_year(left.get("birth_year"))
         right_birth = _coerce_year(right.get("birth_year"))
         year_anchor = (
@@ -696,7 +710,16 @@ def _merge_entity_records(
     if representative_name and entity_name and representative_name != entity_name:
         aliases.add(entity_name)
 
-    for key in ("birth_year", "death_year", "birth_place", "death_place", "gender", "species", "occupation", "description"):
+    for key in (
+        "birth_year",
+        "death_year",
+        "birth_place",
+        "death_place",
+        "gender",
+        "species",
+        "occupation",
+        "description",
+    ):
         if representative.get(key) is None and entity.get(key) is not None:
             representative[key] = entity.get(key)
 
@@ -709,9 +732,7 @@ def _merge_entity_records(
         or " ".join(_name_tokens_for_merge(representative_name))
     ).strip()
     representative["aliases"] = sorted(
-        alias
-        for alias in aliases
-        if alias and alias != representative_name
+        alias for alias in aliases if alias and alias != representative_name
     )
 
 
@@ -836,7 +857,9 @@ def _merge_entities_for_living_graph(
     merged_entities: List[Dict[str, Any]] = []
     merge_groups: List[Dict[str, Any]] = []
 
-    for cluster_ids in sorted(clusters.values(), key=lambda row: (len(row), row), reverse=True):
+    for cluster_ids in sorted(
+        clusters.values(), key=lambda row: (len(row), row), reverse=True
+    ):
         ranked_ids = sorted(
             cluster_ids,
             key=lambda entity_id: _entity_rank_for_merge(entity_by_id[entity_id]),
@@ -964,7 +987,10 @@ def _promote_parent_relations_from_evidence(
         if relation_type not in _WEAK_PARENT_CANDIDATE_TYPES:
             promoted_relations.append(relation)
             continue
-        if _safe_float(relation.get("confidence"), 0.0) < _PARENT_PROMOTION_MIN_CONFIDENCE:
+        if (
+            _safe_float(relation.get("confidence"), 0.0)
+            < _PARENT_PROMOTION_MIN_CONFIDENCE
+        ):
             promoted_relations.append(relation)
             continue
 
@@ -995,8 +1021,12 @@ def _promote_parent_relations_from_evidence(
         target_name = str(target_info.get("name") or "")
         source_name_pos = _name_position_in_quote(source_name, quote_norm)
         target_name_pos = _name_position_in_quote(target_name, quote_norm)
-        source_patronymic_match = _looks_like_patronymic_parent(source_name, target_name)
-        target_patronymic_match = _looks_like_patronymic_parent(target_name, source_name)
+        source_patronymic_match = _looks_like_patronymic_parent(
+            source_name, target_name
+        )
+        target_patronymic_match = _looks_like_patronymic_parent(
+            target_name, source_name
+        )
         has_parent_hint = any(term in quote_norm for term in _PARENT_HINT_TERMS)
         if (
             not has_parent_hint
@@ -1054,9 +1084,15 @@ def _promote_parent_relations_from_evidence(
             source_birth_year = source_info.get("birth_year")
             target_birth_year = target_info.get("birth_year")
             if source_birth_year is not None and target_birth_year is not None:
-                if source_birth_year <= target_birth_year - _PARENT_TIMELINE_MIN_AGE_GAP:
+                if (
+                    source_birth_year
+                    <= target_birth_year - _PARENT_TIMELINE_MIN_AGE_GAP
+                ):
                     source_parent_votes += 1
-                elif target_birth_year <= source_birth_year - _PARENT_TIMELINE_MIN_AGE_GAP:
+                elif (
+                    target_birth_year
+                    <= source_birth_year - _PARENT_TIMELINE_MIN_AGE_GAP
+                ):
                     target_parent_votes += 1
 
             if source_patronymic_match:
@@ -1070,7 +1106,10 @@ def _promote_parent_relations_from_evidence(
             if source_parent_votes == target_parent_votes:
                 promoted_relations.append(relation)
                 continue
-            if has_collateral_terms and abs(source_parent_votes - target_parent_votes) < 2:
+            if (
+                has_collateral_terms
+                and abs(source_parent_votes - target_parent_votes) < 2
+            ):
                 promoted_relations.append(relation)
                 continue
 
@@ -1116,7 +1155,9 @@ def _parent_relation_plausible(
     reasons: List[str] = []
     source_birth = _coerce_year(source_info.get("birth_year"))
     source_death = _coerce_year(source_info.get("death_year"))
-    source_gender = _normalize_gender(source_info.get("gender") or source_info.get("sex"))
+    source_gender = _normalize_gender(
+        source_info.get("gender") or source_info.get("sex")
+    )
     target_birth = _coerce_year(target_info.get("birth_year"))
     target_death = _coerce_year(target_info.get("death_year"))
 
@@ -1164,7 +1205,9 @@ def _promote_avuncular_relations_from_evidence(
     promoted_count = 0
     promoted_relations: List[Dict[str, Any]] = []
     for relation in relations:
-        relation_type_key = _normalize_relation_type(relation.get("relation_type")).lower()
+        relation_type_key = _normalize_relation_type(
+            relation.get("relation_type")
+        ).lower()
         source_id = str(relation.get("source_entity_id") or "").strip()
         target_id = str(relation.get("target_entity_id") or "").strip()
         if (
@@ -1739,7 +1782,9 @@ def _augment_relations_with_kinship(
     for left_id, right_id in sorted(avuncular_sibling_pairs):
         for person_id, sibling_id in ((left_id, right_id), (right_id, left_id)):
             for parent_id in sorted(child_to_parents.get(person_id, set())):
-                parent_type = _parent_relation_type_for_gender(gender_by_id.get(parent_id))
+                parent_type = _parent_relation_type_for_gender(
+                    gender_by_id.get(parent_id)
+                )
                 parent_row = entity_info.get(parent_id, {})
                 sibling_row = entity_info.get(sibling_id, {})
                 is_plausible, _ = _parent_relation_plausible(
@@ -2050,7 +2095,7 @@ def _build_living_graph_html(
       <button id="select-all-rel-types" type="button">Show all</button>
       <button id="clear-all-rel-types" type="button">Hide all</button>
     </div>
-    <div class="filters">{''.join(relation_filters)}</div>
+    <div class="filters">{"".join(relation_filters)}</div>
     {graph_block}
   </section>
 
@@ -2058,7 +2103,7 @@ def _build_living_graph_html(
     <h2>Entities</h2>
     <table>
       <thead><tr><th>entity_id</th><th>canonical_name</th><th>entity_type</th></tr></thead>
-      <tbody>{''.join(entity_rows)}</tbody>
+      <tbody>{"".join(entity_rows)}</tbody>
     </table>
   </section>
 
@@ -2066,7 +2111,7 @@ def _build_living_graph_html(
     <h2>Relations</h2>
     <table>
       <thead><tr><th>source</th><th>type</th><th>target</th><th>confidence</th><th>support_count</th></tr></thead>
-      <tbody>{''.join(relation_rows)}</tbody>
+      <tbody>{"".join(relation_rows)}</tbody>
     </table>
   </section>
 
@@ -2150,7 +2195,6 @@ def _build_living_graph_html(
 """
 
 
-
 def parse_relation_types_arg(raw_value: str | None) -> set[str]:
     return _parse_relation_types_arg(raw_value)
 
@@ -2175,9 +2219,11 @@ def build_living_graph(
     payload = json.loads(input_path.read_text(encoding="utf-8"))
     source_entities = payload.get("entities") or []
     source_relations = payload.get("relations") or []
-    entities, merged_source_relations, entity_merge_groups = _merge_entities_for_living_graph(
-        source_entities,
-        source_relations,
+    entities, merged_source_relations, entity_merge_groups = (
+        _merge_entities_for_living_graph(
+            source_entities,
+            source_relations,
+        )
     )
     promoted_relations, promoted_count = _promote_parent_relations_from_evidence(
         entities,
@@ -2187,9 +2233,11 @@ def build_living_graph(
     avuncular_promoted_relations, avuncular_promoted_count = (
         _promote_avuncular_relations_from_evidence(entities, normalized_relations)
     )
-    timeline_guarded_relations, parent_timeline_repairs = _apply_parent_timeline_guardrails(
-        entities,
-        avuncular_promoted_relations,
+    timeline_guarded_relations, parent_timeline_repairs = (
+        _apply_parent_timeline_guardrails(
+            entities,
+            avuncular_promoted_relations,
+        )
     )
     (
         conflict_resolved_relations,

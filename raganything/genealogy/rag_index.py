@@ -134,7 +134,9 @@ def _format_years(row: Dict[str, Any]) -> str:
     return ""
 
 
-def _rag_doc(kind: str, stable_key: str, text: str, metadata: Dict[str, Any]) -> GenealogyRAGDocument:
+def _rag_doc(
+    kind: str, stable_key: str, text: str, metadata: Dict[str, Any]
+) -> GenealogyRAGDocument:
     return GenealogyRAGDocument(
         document_id=_stable_id("rag", kind, stable_key),
         kind=kind,
@@ -164,7 +166,9 @@ def _claim_text(row: Dict[str, Any]) -> str:
             f"{person2.get('name') or 'unknown person'}."
         )
     else:
-        base = f"Genealogy claim ({claim_type}): {json.dumps(data, ensure_ascii=False)}."
+        base = (
+            f"Genealogy claim ({claim_type}): {json.dumps(data, ensure_ascii=False)}."
+        )
 
     quotes = [
         str(item.get("quote") or "").strip()
@@ -248,23 +252,34 @@ def _person_documents(
 
         lines = [f"Person: {person.get('name') or person_id}{_format_years(person)}."]
         if person.get("aliases"):
-            lines.append(f"Aliases: {', '.join(str(alias) for alias in person['aliases'])}.")
+            lines.append(
+                f"Aliases: {', '.join(str(alias) for alias in person['aliases'])}."
+            )
         if parents:
             lines.append(
                 "Parents: "
-                + ", ".join(_person_name(person_by_id, parent_id) for parent_id in sorted(parents))
+                + ", ".join(
+                    _person_name(person_by_id, parent_id)
+                    for parent_id in sorted(parents)
+                )
                 + "."
             )
         if spouses:
             lines.append(
                 "Spouses: "
-                + ", ".join(_person_name(person_by_id, spouse_id) for spouse_id in sorted(spouses))
+                + ", ".join(
+                    _person_name(person_by_id, spouse_id)
+                    for spouse_id in sorted(spouses)
+                )
                 + "."
             )
         if children:
             lines.append(
                 "Children: "
-                + ", ".join(_person_name(person_by_id, child_id) for child_id in sorted(children))
+                + ", ".join(
+                    _person_name(person_by_id, child_id)
+                    for child_id in sorted(children)
+                )
                 + "."
             )
 
@@ -305,7 +320,9 @@ def _family_documents(
     for child_id, parent_ids in child_to_parents.items():
         if not parent_ids:
             continue
-        children_by_parent_set.setdefault(tuple(sorted(parent_ids)), set()).add(child_id)
+        children_by_parent_set.setdefault(tuple(sorted(parent_ids)), set()).add(
+            child_id
+        )
 
     family_keys = set(children_by_parent_set) | spouse_pairs
     for parent_key in sorted(family_keys):
@@ -314,7 +331,9 @@ def _family_documents(
         family_id = _stable_id("family", *parent_key)
         parent_ids = list(parent_key)
         child_ids = sorted(children_by_parent_set.get(parent_key, set()))
-        parent_names = [_person_name(person_by_id, person_id) for person_id in parent_ids]
+        parent_names = [
+            _person_name(person_by_id, person_id) for person_id in parent_ids
+        ]
         child_names = [_person_name(person_by_id, person_id) for person_id in child_ids]
         text = (
             f"Family: {family_id}. "
@@ -448,12 +467,13 @@ def _mention_documents(
             str(item) for item in mention.get("candidate_person_ids") or []
         ]
         if candidate_person_ids:
-            candidate_text = " Candidate people: " + ", ".join(candidate_person_ids) + "."
+            candidate_text = (
+                " Candidate people: " + ", ".join(candidate_person_ids) + "."
+            )
         else:
             candidate_text = " Candidate people: none resolved."
         text = (
-            f"Mention: {surface}. Normalized name: {normalized_name}."
-            f"{candidate_text}"
+            f"Mention: {surface}. Normalized name: {normalized_name}.{candidate_text}"
         )
         yield _rag_doc(
             "mention",
@@ -545,7 +565,11 @@ def build_rag_documents_from_artifacts(input_dir: Path) -> List[GenealogyRAGDocu
     mentions_path = input_dir / "mentions.jsonl"
     resolution_path = input_dir / "person_resolution.json"
 
-    people = json.loads(people_path.read_text(encoding="utf-8")) if people_path.exists() else []
+    people = (
+        json.loads(people_path.read_text(encoding="utf-8"))
+        if people_path.exists()
+        else []
+    )
     relationships = (
         json.loads(relationships_path.read_text(encoding="utf-8"))
         if relationships_path.exists()

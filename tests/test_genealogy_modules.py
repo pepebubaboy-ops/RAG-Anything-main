@@ -106,7 +106,9 @@ def test_build_genealogy_tree_and_export_public_api(tmp_path: Path) -> None:
     assert claims[0]["evidence"][0]["doc_id"].startswith("source-")
     assert claims[0]["evidence"][0]["chunk_id"].startswith("chunk-")
 
-    relationships = json.loads((output_dir / "relationships.json").read_text(encoding="utf-8"))
+    relationships = json.loads(
+        (output_dir / "relationships.json").read_text(encoding="utf-8")
+    )
     relationship_types = {row["relationship_type"] for row in relationships}
     assert relationship_types == {"parent_of", "spouse_of"}
     assert all(row["claim_ids"] for row in relationships)
@@ -135,9 +137,13 @@ def test_build_genealogy_tree_and_export_public_api(tmp_path: Path) -> None:
         "mention",
         "resolution",
     } <= rag_kinds
-    assert any("Alice Doe" in row["text"] for row in rag_docs if row["kind"] == "person")
+    assert any(
+        "Alice Doe" in row["text"] for row in rag_docs if row["kind"] == "person"
+    )
 
-    contexts = retrieve_genealogy_context("Who are Alice Doe parents?", output_dir, top_k=3)
+    contexts = retrieve_genealogy_context(
+        "Who are Alice Doe parents?", output_dir, top_k=3
+    )
     assert contexts
     assert any("Bob Doe" in context.text for context in contexts)
     prompt = build_genealogy_answer_prompt("Who are Alice Doe parents?", contexts)
@@ -149,7 +155,9 @@ def test_build_genealogy_tree_and_export_public_api(tmp_path: Path) -> None:
     assert "0 HEAD" in gedcom_path.read_text(encoding="utf-8")
 
 
-def test_unresolved_mentions_do_not_create_people_or_relationships(tmp_path: Path) -> None:
+def test_unresolved_mentions_do_not_create_people_or_relationships(
+    tmp_path: Path,
+) -> None:
     payload = [
         {
             "type": "text",
@@ -170,7 +178,10 @@ def test_unresolved_mentions_do_not_create_people_or_relationships(tmp_path: Pat
     assert result.details["mentions_count"] == 2
     assert result.details["resolved_mentions_count"] == 0
     assert result.details["unresolved_mentions_count"] == 2
-    assert json.loads((output_dir / "relationships.json").read_text(encoding="utf-8")) == []
+    assert (
+        json.loads((output_dir / "relationships.json").read_text(encoding="utf-8"))
+        == []
+    )
     resolution = json.loads(
         (output_dir / "person_resolution.json").read_text(encoding="utf-8")
     )
@@ -201,7 +212,9 @@ def test_build_genealogy_tree_reports_graph_conflicts(tmp_path: Path) -> None:
     assert result.details["conflicts_count"] == 1
     conflicts = json.loads((output_dir / "conflicts.json").read_text(encoding="utf-8"))
     assert conflicts[0]["conflict_type"] == "implausible_parent_age_gap"
-    relationships = json.loads((output_dir / "relationships.json").read_text(encoding="utf-8"))
+    relationships = json.loads(
+        (output_dir / "relationships.json").read_text(encoding="utf-8")
+    )
     assert {row["status"] for row in relationships} == {"accepted", "conflict"}
 
     rag_docs = list(read_jsonl(output_dir / "rag_documents.jsonl"))
@@ -240,7 +253,9 @@ def test_build_genealogy_tree_reports_parent_cycles(tmp_path: Path) -> None:
     assert result.details["relationships_count"] == 2
     conflicts = json.loads((output_dir / "conflicts.json").read_text(encoding="utf-8"))
     assert "parent_cycle" in {row["conflict_type"] for row in conflicts}
-    relationships = json.loads((output_dir / "relationships.json").read_text(encoding="utf-8"))
+    relationships = json.loads(
+        (output_dir / "relationships.json").read_text(encoding="utf-8")
+    )
     assert {row["status"] for row in relationships} == {"conflict"}
 
 
@@ -277,7 +292,9 @@ def test_retrieval_prioritizes_exact_person_and_graph_relationships(
     output_dir = tmp_path / "out"
     build_genealogy_tree(fixture_path, output_dir)
 
-    resolved = resolve_genealogy_query("Who are Nicholas II Romanov parents?", output_dir)
+    resolved = resolve_genealogy_query(
+        "Who are Nicholas II Romanov parents?", output_dir
+    )
     assert resolved is not None
     assert resolved.name == "Nicholas II Romanov"
     assert resolved.intent == "parents"
@@ -442,7 +459,9 @@ def test_llm_claim_pipeline_repairs_validates_and_builds_graph(tmp_path: Path) -
     assert (output_dir / "llm_extraction_raw.jsonl").exists()
     assert (output_dir / "llm_claim_candidates.jsonl").exists()
 
-    relationships = json.loads((output_dir / "relationships.json").read_text(encoding="utf-8"))
+    relationships = json.loads(
+        (output_dir / "relationships.json").read_text(encoding="utf-8")
+    )
     assert len(relationships) == 1
     assert relationships[0]["relationship_type"] == "spouse_of"
     assert relationships[0]["status"] == "accepted"

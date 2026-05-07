@@ -21,6 +21,7 @@ from .knowledge_graph import (
     write_evidences,
     write_knowledge_graph_artifacts,
 )
+from .json_utils import robust_json_loads
 from .mentions import MentionRecord, extract_mentions_from_text, write_mentions
 from .models import Claim, Evidence
 from .rag_index import read_jsonl, write_jsonl, write_rag_documents
@@ -238,7 +239,9 @@ def find_candidate_chunks(
             previous_text = str(source_chunks[offset].get("text") or "").strip()
             if previous_text:
                 previous_parts.append(previous_text)
-        for offset in range(index + 1, min(len(source_chunks), index + 1 + context_window)):
+        for offset in range(
+            index + 1, min(len(source_chunks), index + 1 + context_window)
+        ):
             next_text = str(source_chunks[offset].get("text") or "").strip()
             if next_text:
                 next_parts.append(next_text)
@@ -250,7 +253,9 @@ def find_candidate_chunks(
             chunk_id=chunk_id,
             source_id=source_id,
             text=text,
-            page_idx=chunk.get("page_idx") if isinstance(chunk.get("page_idx"), int) else None,
+            page_idx=chunk.get("page_idx")
+            if isinstance(chunk.get("page_idx"), int)
+            else None,
             previous_text="\n\n".join(previous_parts),
             next_text="\n\n".join(next_parts),
             subject_hint=_subject_hint_for_index(source_chunks, index),
@@ -318,41 +323,6 @@ Text:
 """.strip()
 
 
-def robust_json_loads(text: str) -> Any | None:
-    raw = str(text or "").strip()
-    if not raw:
-        return None
-    fenced = re.search(r"```(?:json)?\s*(.*?)```", raw, flags=re.DOTALL | re.IGNORECASE)
-    if fenced:
-        raw = fenced.group(1).strip()
-
-    candidates = [raw]
-    first_object = raw.find("{")
-    last_object = raw.rfind("}")
-    if first_object != -1 and last_object > first_object:
-        candidates.append(raw[first_object : last_object + 1])
-    first_array = raw.find("[")
-    last_array = raw.rfind("]")
-    if first_array != -1 and last_array > first_array:
-        candidates.append(raw[first_array : last_array + 1])
-
-    for candidate in candidates:
-        try:
-            return json.loads(candidate)
-        except json.JSONDecodeError:
-            pass
-
-    try:
-        from json_repair import repair_json
-
-        repaired = repair_json(raw)
-        if isinstance(repaired, str):
-            return json.loads(repaired)
-        return repaired
-    except Exception:
-        return None
-
-
 def _ollama_extra_body(base_url: str, api_key: str) -> dict[str, Any]:
     body: dict[str, Any] = {}
     if "11434" in str(base_url) or str(api_key).lower() == "ollama":
@@ -395,8 +365,7 @@ def _openai_compatible_completion(
             {
                 "role": "system",
                 "content": (
-                    "You are a strict genealogy extraction engine. "
-                    "Return JSON only."
+                    "You are a strict genealogy extraction engine. Return JSON only."
                 ),
             },
             {"role": "user", "content": prompt},
@@ -606,7 +575,9 @@ def _claim_row_from_raw(
     elif claim_type == "spouse":
         person1 = _person_payload(raw_claim.get("person1") or raw_claim.get("spouse1"))
         person2 = _person_payload(raw_claim.get("person2") or raw_claim.get("spouse2"))
-        if not _person_name_is_specific(person1) or not _person_name_is_specific(person2):
+        if not _person_name_is_specific(person1) or not _person_name_is_specific(
+            person2
+        ):
             return None, "rejected_missing_person_role"
         data = {"person1": person1, "person2": person2}
     else:
@@ -696,7 +667,9 @@ def validate_llm_extractions(
                 )
                 rows.append(
                     ValidatedClaimRow(
-                        status="accepted_candidate" if claim_row is not None else "rejected",
+                        status="accepted_candidate"
+                        if claim_row is not None
+                        else "rejected",
                         reason=reason,
                         candidate_id=raw_row.candidate_id,
                         chunk_id=raw_row.chunk_id,
@@ -758,7 +731,9 @@ def _claim_from_row(row: dict[str, Any]) -> Claim:
     )
 
 
-def _load_mentions(input_dir: Path, chunks: Sequence[dict[str, Any]]) -> list[MentionRecord]:
+def _load_mentions(
+    input_dir: Path, chunks: Sequence[dict[str, Any]]
+) -> list[MentionRecord]:
     mentions_path = input_dir / "mentions.jsonl"
     mentions: list[MentionRecord] = []
     if mentions_path.exists():
@@ -770,12 +745,18 @@ def _load_mentions(input_dir: Path, chunks: Sequence[dict[str, Any]]) -> list[Me
                     chunk_id=str(row.get("chunk_id") or ""),
                     surface=str(row.get("surface") or ""),
                     normalized_name=str(row.get("normalized_name") or ""),
-                    page_idx=row.get("page_idx") if isinstance(row.get("page_idx"), int) else None,
+                    page_idx=row.get("page_idx")
+                    if isinstance(row.get("page_idx"), int)
+                    else None,
                     span_start=(
-                        row.get("span_start") if isinstance(row.get("span_start"), int) else None
+                        row.get("span_start")
+                        if isinstance(row.get("span_start"), int)
+                        else None
                     ),
                     span_end=(
-                        row.get("span_end") if isinstance(row.get("span_end"), int) else None
+                        row.get("span_end")
+                        if isinstance(row.get("span_end"), int)
+                        else None
                     ),
                     mention_type=str(row.get("mention_type") or "person"),
                     attributes=dict(row.get("attributes") or {}),
@@ -792,7 +773,9 @@ def _load_mentions(input_dir: Path, chunks: Sequence[dict[str, Any]]) -> list[Me
                 str(chunk.get("text") or ""),
                 source_id=str(chunk.get("source_id") or ""),
                 chunk_id=str(chunk.get("chunk_id") or ""),
-                page_idx=chunk.get("page_idx") if isinstance(chunk.get("page_idx"), int) else None,
+                page_idx=chunk.get("page_idx")
+                if isinstance(chunk.get("page_idx"), int)
+                else None,
             )
         )
     return mentions
@@ -844,7 +827,9 @@ def build_graph_from_validated_claims(
     )
     rag_documents_path = write_rag_documents(output_dir)
     rag_documents_count = sum(
-        1 for line in rag_documents_path.read_text(encoding="utf-8").splitlines() if line
+        1
+        for line in rag_documents_path.read_text(encoding="utf-8").splitlines()
+        if line
     )
     resolution_summary = person_resolution.get("summary") or {}
 

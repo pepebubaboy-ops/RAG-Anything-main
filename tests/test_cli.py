@@ -12,6 +12,7 @@ from raganything.cli import main
     "argv",
     [
         ["--help"],
+        ["genealogy", "--help"],
         ["genealogy", "build", "--help"],
     ],
 )
@@ -250,12 +251,18 @@ def test_cli_reference_reconciliation_keeps_distinct_similar_names(
                     "normalized_name": "maria feodorovna wurttemberg",
                 },
                 {"name": "Nicholas I Romanov", "normalized_name": "nicholas i romanov"},
-                {"name": "Alexander III Romanov", "normalized_name": "alexander iii romanov"},
+                {
+                    "name": "Alexander III Romanov",
+                    "normalized_name": "alexander iii romanov",
+                },
                 {
                     "name": "Maria Feodorovna Dagmar",
                     "normalized_name": "maria feodorovna dagmar",
                 },
-                {"name": "Nicholas II Romanov", "normalized_name": "nicholas ii romanov"},
+                {
+                    "name": "Nicholas II Romanov",
+                    "normalized_name": "nicholas ii romanov",
+                },
             ],
             ensure_ascii=False,
             indent=2,
@@ -413,12 +420,36 @@ def test_cli_living_graph_derive_kinship(tmp_path: Path) -> None:
             {"entity_id": "c2", "canonical_name": "Child Two", "gender": "female"},
         ],
         "relations": [
-            {"source_entity_id": "gp1", "target_entity_id": "p1", "relation_type": "parent_child"},
-            {"source_entity_id": "gp2", "target_entity_id": "p1", "relation_type": "parent_child"},
-            {"source_entity_id": "gp1", "target_entity_id": "p2", "relation_type": "parent_child"},
-            {"source_entity_id": "gp2", "target_entity_id": "p2", "relation_type": "parent_child"},
-            {"source_entity_id": "p1", "target_entity_id": "c1", "relation_type": "parent_child"},
-            {"source_entity_id": "p2", "target_entity_id": "c2", "relation_type": "parent_child"},
+            {
+                "source_entity_id": "gp1",
+                "target_entity_id": "p1",
+                "relation_type": "parent_child",
+            },
+            {
+                "source_entity_id": "gp2",
+                "target_entity_id": "p1",
+                "relation_type": "parent_child",
+            },
+            {
+                "source_entity_id": "gp1",
+                "target_entity_id": "p2",
+                "relation_type": "parent_child",
+            },
+            {
+                "source_entity_id": "gp2",
+                "target_entity_id": "p2",
+                "relation_type": "parent_child",
+            },
+            {
+                "source_entity_id": "p1",
+                "target_entity_id": "c1",
+                "relation_type": "parent_child",
+            },
+            {
+                "source_entity_id": "p2",
+                "target_entity_id": "c2",
+                "relation_type": "parent_child",
+            },
         ],
     }
     fixture_path = tmp_path / "living_with_kinship.json"
@@ -647,7 +678,9 @@ def test_cli_living_graph_resolves_parent_role_conflicts(tmp_path: Path) -> None
     assert code == 0
 
     relations = json.loads((output_dir / "relations.json").read_text(encoding="utf-8"))
-    father_relations = [row for row in relations if row.get("relation_type") == "father_of"]
+    father_relations = [
+        row for row in relations if row.get("relation_type") == "father_of"
+    ]
     assert len(father_relations) == 1
     assert father_relations[0]["source_entity_id"] == "father-1"
     assert father_relations[0]["target_entity_id"] == "child-1"
@@ -805,7 +838,9 @@ def test_cli_living_graph_parent_conflict_prefers_quote_parent_anchor(
     assert code == 0
 
     relations = json.loads((output_dir / "relations.json").read_text(encoding="utf-8"))
-    father_relations = [row for row in relations if row.get("relation_type") == "father_of"]
+    father_relations = [
+        row for row in relations if row.get("relation_type") == "father_of"
+    ]
     assert len(father_relations) == 1
     assert father_relations[0]["source_entity_id"] == "paul"
     assert father_relations[0]["target_entity_id"] == "nicholas"
@@ -888,7 +923,9 @@ def test_cli_living_graph_merges_duplicate_entities(tmp_path: Path) -> None:
     assert "romanov_2" not in entity_ids
     assert {"romanov_1", "child_1"} == entity_ids
 
-    father_relations = [row for row in relations if row.get("relation_type") == "father_of"]
+    father_relations = [
+        row for row in relations if row.get("relation_type") == "father_of"
+    ]
     assert len(father_relations) == 1
     assert father_relations[0]["source_entity_id"] == "romanov_1"
     assert father_relations[0]["target_entity_id"] == "child_1"

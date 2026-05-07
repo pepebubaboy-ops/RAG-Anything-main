@@ -1,78 +1,79 @@
-# Python-related files
+# Python
 __pycache__/
 *.py[cod]
 *.egg-info/
 .eggs/
-*.tgz
-*.tar.gz
-*.ini
+.python-version
 
-# Virtual Environment
+# Virtual environments
 .venv/
 .venv*/
 env/
 venv/
 
-*.env*
-.env_example
-
-# Build / Distribution
+# Build and test caches
 dist/
 build/
 site/
-
-# Logs / Reports
-*.log
-*.log.*
-*.logfire
-*.coverage/
-log/
-
-# Caches
 .cache/
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
-.gradio/
-.history/
-temp/
+.coverage
+.coverage.*
+htmlcov/
 
-# IDE / Editor Files
+# Local secrets and editor files
+*.env*
+!.env.example
+.DS_Store
 .idea/
 .vscode/
 .vscode/settings.json
 
-# Framework-specific files
-local_neo4jWorkDir/
-neo4jWorkDir/
+# Local/private genealogy inputs and outputs
+/inputs/
+/outputs/
+/output*/
+/**/_parsed_pdf/
 
-# Data & Storage
-inputs/
-rag_storage*/
-examples/input/
-examples/output/
-output*/
+# Books, scans, archives, and rendered media
+*.pdf
+*.tif
+*.tiff
+*.jpg
+*.jpeg
+*.png
+*.zip
 
-# Miscellaneous
-.DS_Store
+# Generated genealogy/RAG artifacts
+/**/llm_extraction_raw.jsonl
+/**/claims.jsonl
+/**/source_chunks.jsonl
+/**/people.json
+/**/relationships.json
+/**/tree.html
+/**/tree.dot
+/**/candidate_chunks.jsonl
+/**/llm_claim_candidates.jsonl
+/**/rag_documents.jsonl
+/**/mentions.jsonl
+/**/evidences.jsonl
+/**/families.json
+/**/sources.json
+/**/conflicts.json
+/**/person_resolution.json
+
+# Keep test fixtures trackable.
+!/tests/fixtures/
+!/tests/fixtures/**
+
+# Logs
+*.log
+*.log.*
+log/
+
+# Miscellaneous local files
 TODO.md
 ignore_this.txt
 *.ignore.*
-
-# Project-specific files
-dickens*/
-book.txt
-LightRAG.pdf
-LightRAG_2-4.pdf
-download_models_hf.py
-lightrag-dev/
-gui/
-tiktoken_cache/
-
-# Cline files
-memory-bank/
-
-# AI
-.claude/
-.cursor/
-CLAUDE.md

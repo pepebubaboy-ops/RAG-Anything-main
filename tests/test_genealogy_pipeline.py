@@ -1,5 +1,3 @@
-import json
-
 import pytest
 
 from raganything.genealogy.extractors import ClaimExtractor
@@ -21,7 +19,12 @@ class ToyExtractor(ClaimExtractor):
                         "parents": [{"name": "Bob Doe"}, {"name": "Carol Smith"}],
                         "child": {"name": "Alice Doe", "birth_year": 1980},
                     },
-                    evidence=[Evidence(file_path="toy.txt", quote="Alice, daughter of Bob and Carol")],
+                    evidence=[
+                        Evidence(
+                            file_path="toy.txt",
+                            quote="Alice, daughter of Bob and Carol",
+                        )
+                    ],
                 )
             ]
 
@@ -37,7 +40,12 @@ class ToyExtractor(ClaimExtractor):
                             "parents": [{"name": "Bob Doe"}, {"name": "Carol Smith"}],
                             "child": {"name": "David Doe", "birth_year": 1982},
                         },
-                        evidence=[Evidence(file_path="toy.txt", quote="Bob and Carol had a son David")],
+                        evidence=[
+                            Evidence(
+                                file_path="toy.txt",
+                                quote="Bob and Carol had a son David",
+                            )
+                        ],
                     )
                 ]
 
@@ -50,7 +58,12 @@ class ToyExtractor(ClaimExtractor):
                             "parents": [{"name": "David Doe"}, {"name": "Emma Roe"}],
                             "child": {"name": "Frank Doe", "birth_year": 2010},
                         },
-                        evidence=[Evidence(file_path="toy.txt", quote="Frank, child of David and Emma")],
+                        evidence=[
+                            Evidence(
+                                file_path="toy.txt",
+                                quote="Frank, child of David and Emma",
+                            )
+                        ],
                     )
                 ]
 
@@ -60,8 +73,13 @@ class ToyExtractor(ClaimExtractor):
                 Claim(
                     claim_type="spouse",
                     confidence=0.7,
-                    data={"person1": {"name": "David Doe"}, "person2": {"name": "Emma Roe"}},
-                    evidence=[Evidence(file_path="toy.txt", quote="David married Emma")],
+                    data={
+                        "person1": {"name": "David Doe"},
+                        "person2": {"name": "Emma Roe"},
+                    },
+                    evidence=[
+                        Evidence(file_path="toy.txt", quote="David married Emma")
+                    ],
                 )
             ]
 
@@ -104,13 +122,22 @@ async def test_genealogy_pipeline_expands_graph():
     pipeline = GenealogyPipeline(
         store=store,
         extractor=ToyExtractor(),
-        config=GenealogyPipelineConfig(max_depth=4, max_tasks=50, enable_spouse_search=True, enable_descendant_expansion=True),
+        config=GenealogyPipelineConfig(
+            max_depth=4,
+            max_tasks=50,
+            enable_spouse_search=True,
+            enable_descendant_expansion=True,
+        ),
     )
 
-    seed = pipeline.seed_person(PersonSpec(name="Alice Doe", birth_year=1980, birth_place="Springfield"))
+    seed = pipeline.seed_person(
+        PersonSpec(name="Alice Doe", birth_year=1980, birth_place="Springfield")
+    )
     stats = await pipeline.expand(seed.person_id)
 
-    assert stats["people"] >= 5  # Alice, Bob, Carol, David, Emma, Frank (Emma may be created)
+    assert (
+        stats["people"] >= 5
+    )  # Alice, Bob, Carol, David, Emma, Frank (Emma may be created)
 
     names = sorted({p.spec.name for p in store.people.values()})
     assert "Alice Doe" in names

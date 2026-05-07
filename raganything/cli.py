@@ -28,8 +28,12 @@ def _cmd_genealogy_build(args: argparse.Namespace) -> int:
         result = build_living_graph(
             input_path,
             output_dir,
-            include_relation_types=parse_relation_types_arg(args.include_relation_types),
-            exclude_relation_types=parse_relation_types_arg(args.exclude_relation_types),
+            include_relation_types=parse_relation_types_arg(
+                args.include_relation_types
+            ),
+            exclude_relation_types=parse_relation_types_arg(
+                args.exclude_relation_types
+            ),
             derive_kinship=bool(args.derive_kinship),
             max_relations=int(args.max_relations),
         )
@@ -112,8 +116,10 @@ def _cmd_genealogy_llm_extract(args: argparse.Namespace) -> int:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="raganything",
-        description="Offline-first genealogy and optional multimodal tooling.",
+        prog="genealogy-rag",
+        description=(
+            "Local-first genealogy extraction, claims, graph, retrieval, and exports."
+        ),
     )
     parser.add_argument(
         "--version",
@@ -123,12 +129,15 @@ def _build_parser() -> argparse.ArgumentParser:
 
     subparsers = parser.add_subparsers(dest="command")
 
-    genealogy_parser = subparsers.add_parser("genealogy", help="Genealogy commands")
+    genealogy_parser = subparsers.add_parser(
+        "genealogy",
+        help="Local genealogy claims, graph, retrieval, and export commands",
+    )
     genealogy_subparsers = genealogy_parser.add_subparsers(dest="genealogy_command")
 
     build_parser = genealogy_subparsers.add_parser(
         "build",
-        help="Build a local family tree from content_list JSON or PDF",
+        help="Build local genealogy artifacts from content_list JSON or PDF",
     )
     build_parser.add_argument(
         "--input",
@@ -137,20 +146,23 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     build_parser.add_argument(
         "--output",
-        default="./output_genealogy",
-        help="Output directory for generated tree files",
+        default="./outputs",
+        help="Output directory for local claims, graph, retrieval, and export files",
     )
     build_parser.add_argument(
         "--parse-method",
         choices=["none", "mineru", "docling"],
         default="none",
-        help="PDF parsing backend; default is none for offline safety",
+        help="PDF parsing backend; default is none for local/offline safety",
     )
     build_parser.add_argument(
         "--graph-mode",
         choices=["auto", "tree", "living"],
         default="auto",
-        help="auto: detect by input type, tree: family tree from content_list, living: relation graph from living_graph.json",
+        help=(
+            "auto: detect by input type, tree: family tree from content_list, "
+            "living: relation graph from living_graph.json"
+        ),
     )
     build_parser.add_argument(
         "--max-relations",
@@ -188,7 +200,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     export_parser = genealogy_subparsers.add_parser(
         "export",
-        help="Export existing people/families artifacts to another format",
+        help="Export local people/families graph artifacts",
     )
     export_parser.add_argument(
         "--input",
@@ -217,7 +229,7 @@ def _build_parser() -> argparse.ArgumentParser:
     llm_parser.add_argument(
         "--input",
         required=True,
-        help="Directory containing source_chunks.jsonl from genealogy build",
+        help="Directory containing local source_chunks.jsonl from genealogy build",
     )
     llm_parser.add_argument(
         "--output",
@@ -231,12 +243,18 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     llm_parser.add_argument(
         "--llm-base-url",
-        default=os.getenv("LLM_BINDING_HOST", "http://localhost:11434/v1"),
+        default=os.getenv(
+            "LLM_BASE_URL",
+            os.getenv("LLM_BINDING_HOST", "http://localhost:11434/v1"),
+        ),
         help="OpenAI-compatible local LLM base URL",
     )
     llm_parser.add_argument(
         "--llm-api-key",
-        default=os.getenv("LLM_BINDING_API_KEY", "ollama"),
+        default=os.getenv(
+            "LLM_API_KEY",
+            os.getenv("LLM_BINDING_API_KEY", "ollama"),
+        ),
         help="API key for local OpenAI-compatible endpoint",
     )
     llm_parser.add_argument(

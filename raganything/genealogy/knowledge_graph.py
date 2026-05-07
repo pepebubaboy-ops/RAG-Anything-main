@@ -55,7 +55,9 @@ def write_evidences(output_dir: Path, claim_rows: Sequence[Dict[str, Any]]) -> P
         for evidence in claim.get("evidence") or []:
             if not isinstance(evidence, dict):
                 continue
-            evidence_id = str(evidence.get("evidence_id") or evidence_id_for_row(evidence))
+            evidence_id = str(
+                evidence.get("evidence_id") or evidence_id_for_row(evidence)
+            )
             key = (claim_id, evidence_id)
             if key in seen:
                 continue
@@ -88,7 +90,9 @@ def _year(value: Any) -> int | None:
     return year
 
 
-def _person_key_from_payload(payload: Dict[str, Any]) -> tuple[str, int | None, int | None]:
+def _person_key_from_payload(
+    payload: Dict[str, Any],
+) -> tuple[str, int | None, int | None]:
     return (
         normalize_name(str(payload.get("name") or "")),
         _year(payload.get("birth_year")),
@@ -124,13 +128,23 @@ def _resolve_person(
     def compatible(candidate: Dict[str, Any]) -> bool:
         candidate_birth = _year(candidate.get("birth_year"))
         candidate_death = _year(candidate.get("death_year"))
-        if birth_year is not None and candidate_birth is not None and birth_year != candidate_birth:
+        if (
+            birth_year is not None
+            and candidate_birth is not None
+            and birth_year != candidate_birth
+        ):
             return False
-        if death_year is not None and candidate_death is not None and death_year != candidate_death:
+        if (
+            death_year is not None
+            and candidate_death is not None
+            and death_year != candidate_death
+        ):
             return False
         return True
 
-    compatible_candidates = [candidate for candidate in candidates if compatible(candidate)]
+    compatible_candidates = [
+        candidate for candidate in candidates if compatible(candidate)
+    ]
     if compatible_candidates:
         candidates = compatible_candidates
     return sorted(candidates, key=lambda row: str(row.get("person_id") or ""))[0]
@@ -213,12 +227,16 @@ def _add_relationship(
 
     if claim_id and claim_id not in existing["claim_ids"]:
         existing["claim_ids"].append(claim_id)
-    existing["evidence_ids"] = sorted(set(existing.get("evidence_ids") or []) | set(evidence_ids))
+    existing["evidence_ids"] = sorted(
+        set(existing.get("evidence_ids") or []) | set(evidence_ids)
+    )
     existing["confidence"] = _relationship_confidence(
         float(existing.get("confidence") or 0.0),
         claim.get("confidence"),
     )
-    existing["support_count"] = len(existing["claim_ids"]) or int(existing.get("support_count") or 1)
+    existing["support_count"] = len(existing["claim_ids"]) or int(
+        existing.get("support_count") or 1
+    )
     if existing["status"] == "pending" and claim.get("applied", True):
         existing["status"] = "accepted"
 
@@ -381,7 +399,7 @@ def _validate_relationships(
                         "age_gap": age_gap,
                     },
                 )
-        )
+            )
 
     relationship_groups: Dict[Tuple[str, str, str], List[Dict[str, Any]]] = {}
     for relationship in relationships:

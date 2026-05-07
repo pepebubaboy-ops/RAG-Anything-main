@@ -105,7 +105,6 @@ def _iter_json_array_objects(path: Path) -> Iterator[Dict[str, Any]]:
                 return
 
 
-
 def _find_content_list_files(input_path: Path) -> List[Path]:
     if input_path.is_file():
         if input_path.suffix.lower() != ".json":
@@ -128,7 +127,6 @@ def _find_content_list_files(input_path: Path) -> List[Path]:
     raise FileNotFoundError(f"Input path does not exist: {input_path}")
 
 
-
 def _parse_pdf_to_content_list(
     input_pdf: Path,
     parse_method: str,
@@ -148,7 +146,7 @@ def _parse_pdf_to_content_list(
     if parse_method == "mineru" and find_spec("mineru") is None:
         raise RuntimeError(
             "PDF parsing with MinerU requires optional dependency. "
-            "Install extras: pip install 'raganything[mineru]'"
+            "Install extras: pip install 'genealogy-rag-core[mineru]'"
         )
 
     if parse_method == "docling" and shutil.which("docling") is None:
@@ -186,7 +184,6 @@ def _parse_pdf_to_content_list(
         lang=parse_lang,
         **parser_kwargs,
     )
-
 
 
 def _apply_claim_to_store(store: InMemoryGenealogyStore, claim: Claim) -> bool:
@@ -292,7 +289,6 @@ def _apply_claim_to_store(store: InMemoryGenealogyStore, claim: Claim) -> bool:
     return False
 
 
-
 def _claims_to_jsonl_row(claim: Claim, applied: bool) -> Dict[str, Any]:
     row = {
         "claim_type": claim.claim_type,
@@ -359,7 +355,6 @@ def _iter_claims_and_chunks_from_source_items(
                 source_id=source.source_id,
                 chunk_id=chunk.chunk_id,
             )
-
 
 
 def _name_similarity_score(left: str, right: str) -> float:
@@ -503,7 +498,6 @@ def _reconcile_people_with_reference(
     }
 
 
-
 def build_genealogy_tree(
     input_path: Path,
     output_dir: Path,
@@ -618,7 +612,9 @@ def build_genealogy_tree(
     )
     rag_documents_path = write_rag_documents(output_dir)
     rag_documents_count = sum(
-        1 for line in rag_documents_path.read_text(encoding="utf-8").splitlines() if line
+        1
+        for line in rag_documents_path.read_text(encoding="utf-8").splitlines()
+        if line
     )
     resolution_summary = person_resolution.get("summary") or {}
 

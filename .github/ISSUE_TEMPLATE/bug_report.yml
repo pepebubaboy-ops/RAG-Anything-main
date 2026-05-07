@@ -33,9 +33,9 @@ body:
   - type: textarea
     id: configused
     attributes:
-      label: LightRAG Config Used
-      description: The LightRAG configuration used for the run.
-      placeholder: The settings content or LightRAG configuration
+      label: Local Configuration Used
+      description: The local CLI, parser, LLM endpoint, and storage settings used for the run.
+      placeholder: Paste relevant local settings here
       value: |
         # Paste your config here
   - type: textarea
@@ -49,13 +49,13 @@ body:
     attributes:
       label: Additional Information
       description: |
-        - LightRAG Version: e.g., v0.1.1
+        - genealogy-rag-core Version: e.g., v0.1.0
         - Operating System: e.g., Windows 10, Ubuntu 20.04
-        - Python Version: e.g., 3.8
+        - Python Version: e.g., 3.10
         - Related Issues: e.g., #1
         - Any other relevant information.
       value: |
-        - LightRAG Version:
+        - genealogy-rag-core Version:
         - Operating System:
         - Python Version:
         - Related Issues:

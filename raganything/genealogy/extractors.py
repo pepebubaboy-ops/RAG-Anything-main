@@ -11,7 +11,7 @@ class ClaimExtractor(ABC):
     """Extract structured claims for a task.
 
     Production extractors typically:
-    - query RAG (LightRAG) for relevant context
+    - retrieve local source context
     - run an LLM pass to output strict JSON claims
     """
 

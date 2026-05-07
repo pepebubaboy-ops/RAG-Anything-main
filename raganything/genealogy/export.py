@@ -13,7 +13,6 @@ def _escape_dot(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
-
 def _try_generate_svg_from_dot(dot_path: Path, svg_path: Path) -> bool:
     if shutil.which("dot") is None:
         return False
@@ -27,7 +26,6 @@ def _try_generate_svg_from_dot(dot_path: Path, svg_path: Path) -> bool:
         return True
     except Exception:
         return False
-
 
 
 def _store_to_people_and_families(
@@ -153,10 +151,10 @@ def _build_html_from_people_and_families(
     for person in people:
         person_rows.append(
             (
-                f"<tr><td>{person.get('person_id','')}</td>"
-                f"<td>{person.get('name','')}</td>"
-                f"<td>{person.get('birth_year','') or ''}</td>"
-                f"<td>{person.get('death_year','') or ''}</td></tr>"
+                f"<tr><td>{person.get('person_id', '')}</td>"
+                f"<td>{person.get('name', '')}</td>"
+                f"<td>{person.get('birth_year', '') or ''}</td>"
+                f"<td>{person.get('death_year', '') or ''}</td></tr>"
             )
         )
 
@@ -164,7 +162,7 @@ def _build_html_from_people_and_families(
     for family in families:
         family_rows.append(
             (
-                f"<tr><td>{family.get('family_id','')}</td>"
+                f"<tr><td>{family.get('family_id', '')}</td>"
                 f"<td>{', '.join(family.get('parent_ids') or [])}</td>"
                 f"<td>{', '.join(family.get('child_ids') or [])}</td></tr>"
             )
@@ -196,7 +194,7 @@ def _build_html_from_people_and_families(
     <table>
       <thead><tr><th>person_id</th><th>name</th><th>birth_year</th><th>death_year</th></tr></thead>
       <tbody>
-        {''.join(person_rows)}
+        {"".join(person_rows)}
       </tbody>
     </table>
   </section>
@@ -206,7 +204,7 @@ def _build_html_from_people_and_families(
     <table>
       <thead><tr><th>family_id</th><th>parent_ids</th><th>child_ids</th></tr></thead>
       <tbody>
-        {''.join(family_rows)}
+        {"".join(family_rows)}
       </tbody>
     </table>
   </section>
@@ -219,7 +217,6 @@ def _build_html_from_people_and_families(
 </html>
 """
     return html
-
 
 
 def export_genealogy(

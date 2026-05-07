@@ -8,7 +8,9 @@ def _is_truthy(value: str) -> bool:
 
 
 def is_offline_mode() -> bool:
-    return _is_truthy(os.getenv("RAGANYTHING_OFFLINE", "0"))
+    return _is_truthy(os.getenv("GENEALOGY_RAG_OFFLINE", "0")) or _is_truthy(
+        os.getenv("RAGANYTHING_OFFLINE", "0")
+    )
 
 
 def configure_offline_environment() -> None:
@@ -26,7 +28,7 @@ def ensure_offline_allowed(action: str, hint: str | None = None) -> None:
         return
 
     message = (
-        f"RAGANYTHING_OFFLINE=1 blocks action: {action}. "
+        f"Offline mode blocks action: {action}. "
         "Provide local artifacts or disable offline mode."
     )
     if hint:

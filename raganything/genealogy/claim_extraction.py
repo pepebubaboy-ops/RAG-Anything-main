@@ -59,7 +59,6 @@ _YEAR_RANGE_ANNOTATION_PATTERN = re.compile(
 )
 
 
-
 def _coerce_claim_year(value: Any) -> int | None:
     try:
         year = int(value)
@@ -93,7 +92,10 @@ def _clean_name(value: str) -> str:
     if not tokens:
         return ""
 
-    while len(tokens) > 1 and tokens[-1].strip(".,;:!?").lower() in _GENEALOGY_NAME_NOISE_TOKENS:
+    while (
+        len(tokens) > 1
+        and tokens[-1].strip(".,;:!?").lower() in _GENEALOGY_NAME_NOISE_TOKENS
+    ):
         tokens.pop()
 
     return " ".join(tokens)

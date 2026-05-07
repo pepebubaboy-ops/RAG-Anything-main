@@ -1,9 +1,4 @@
-"""Genealogy expansion helpers for building a canonical family tree.
-
-This package is intentionally lightweight:
-- RAGAnything/LightRAG remains the evidence retrieval layer.
-- A canonical store (e.g., Neo4j) holds the tree, claims, and provenance.
-"""
+"""Local-first genealogy extraction, validation, graph, and retrieval helpers."""
 
 from .models import (
     Claim,

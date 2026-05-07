@@ -1,74 +1,63 @@
-# RAGAnything (Offline-First Genealogy)
+# genealogy-rag-core
 
-This repository is now optimized for local/offline genealogy workflows.
+`genealogy-rag-core` is a local-first genealogy extraction and RAG core for
+private family-history books. It keeps parsing artifacts, prompts, OCR text,
+candidate chunks, model outputs, embeddings, graph files, and logs local by
+default.
+
+## What Works
+
+- `source_chunks` generation from pre-parsed content lists
+- deterministic genealogy claim extraction from text
+- local LLM claim extraction through an OpenAI-compatible endpoint
+- JSON repair, schema validation, and evidence quote validation
+- accepted/rejected/pending claim artifacts
+- people, family, relationship, conflict, evidence, and mention artifacts
+- lightweight retrieval context builders over local JSON/JSONL artifacts
+- exports to DOT, JSON, GEDCOM, and HTML
+
+## Not Yet
+
+- production OCR
+- vector database persistence
+- production chat API or chat UI
 
 ## Install
 
-Minimal (genealogy + CLI):
-
 ```bash
-pip install -e .
+pip install -e ".[dev,llm]"
 ```
 
-With PDF parsing (MinerU):
+The default install has no cloud dependency. The `llm` extra installs the
+OpenAI Python client only so the CLI can talk to a local OpenAI-compatible
+server such as Ollama.
+
+## Local LLM
+
+Example Ollama/OpenAI-compatible configuration:
 
 ```bash
-pip install -e '.[mineru]'
-```
-
-With full optional stack:
-
-```bash
-pip install -e '.[all]'
+export GENEALOGY_RAG_OFFLINE=1
+export RAGANYTHING_OFFLINE=1
+export LLM_BASE_URL=http://localhost:11434/v1
+export LLM_API_KEY=ollama
+export LLM_MODEL=qwen2.5:7b-instruct
 ```
 
 ## CLI
 
-Show help:
-
 ```bash
-raganything --help
+genealogy-rag --help
+genealogy-rag genealogy build --input ./inputs --output ./outputs
+genealogy-rag genealogy llm-extract --input ./outputs --model qwen2.5:7b-instruct --llm-base-url http://localhost:11434/v1
+genealogy-rag genealogy export --input ./outputs --format html
 ```
 
-Build a family tree from `*_content_list.json` (or a directory containing them):
+The temporary `raganything` console script remains as a compatibility alias.
 
-```bash
-raganything genealogy build --input ./inputs --output ./output_genealogy
-```
+## Security
 
-Build and reconcile names/years against a canonical `people.json` (works for any dynasty if you have a trusted reference list):
-
-```bash
-raganything genealogy build --input ./inputs --output ./output_genealogy --reference-people ./canonical_people.json
-```
-
-Build from PDF (requires parser extras/tools):
-
-```bash
-raganything genealogy build --input ./input.pdf --parse-method mineru --output ./output_genealogy
-```
-
-Export existing artifacts:
-
-```bash
-raganything genealogy export --input ./output_genealogy --format dot
-raganything genealogy export --input ./output_genealogy --format json
-raganything genealogy export --input ./output_genealogy --format gedcom
-```
-
-## Offline Mode
-
-Strict offline mode:
-
-```bash
-export RAGANYTHING_OFFLINE=1
-```
-
-In this mode, operations that may require downloads are blocked with a clear error.
-Use pre-parsed `*_content_list.json` for deterministic local runs.
-
-## Notes
-
-- Public `RAGAnything` and `RAGAnythingConfig` exports remain available via lazy import.
-- Heavy dependencies are now in extras (`rag`, `mineru`, `neo4j`, `dotenv`, `all`).
-- Legacy script entrypoints were reduced to thin wrappers in `scripts/`.
+No external APIs are used by default. The documented defaults point to local
+or on-prem endpoints. Treat `inputs/`, `outputs/`, scans, OCR text, JSONL model
+outputs, embeddings, and exported graphs as private data; they are ignored by
+git by default.

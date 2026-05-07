@@ -94,7 +94,9 @@ def _document_indexes(
     return indexes
 
 
-def _score_document(query_tokens: Sequence[str], document: GenealogyRAGDocument) -> float:
+def _score_document(
+    query_tokens: Sequence[str], document: GenealogyRAGDocument
+) -> float:
     if not query_tokens or not document.text:
         return 0.0
 
@@ -229,7 +231,9 @@ def _graph_ranked_contexts(
             person_id = str(relationship.get(person_field) or "")
             if person_id and person_id != resolved_query.person_id:
                 related_person_ids.add(person_id)
-        claim_ids.update(str(item) for item in relationship.get("claim_ids") or [] if item)
+        claim_ids.update(
+            str(item) for item in relationship.get("claim_ids") or [] if item
+        )
 
     for person_id in sorted(related_person_ids):
         _add_documents(
@@ -254,7 +258,9 @@ def _graph_ranked_contexts(
         )
         for document in claim_documents:
             if document.kind == "claim":
-                chunk_ids.update(str(item) for item in document.metadata.get("chunk_ids") or [])
+                chunk_ids.update(
+                    str(item) for item in document.metadata.get("chunk_ids") or []
+                )
 
     _add_documents(
         ranked,

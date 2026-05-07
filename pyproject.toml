@@ -3,56 +3,61 @@ requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "raganything"
+name = "genealogy-rag-core"
 dynamic = ["version"]
 authors = [
-    {name = "Zirui Guo"}
+    {name = "pepebubaboy-ops"}
 ]
-description = "RAGAnything: lightweight offline-first genealogy and optional multimodal RAG toolkit"
+description = "Local-first genealogy extraction and RAG core for private family-history books"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Intended Audience :: Developers",
-    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Text Processing :: Linguistic",
 ]
 dependencies = []
 
 [project.scripts]
+genealogy-rag = "raganything.cli:main"
 raganything = "raganything.cli:main"
 
 [project.optional-dependencies]
-rag = [
-    "huggingface_hub",
-    "lightrag-hku",
-    "tqdm",
+llm = [
+    "openai>=1.0.0",
+    "json-repair>=0.30.0",
 ]
-mineru = ["mineru[core]"]
 neo4j = ["neo4j>=5.0.0"]
-dotenv = ["python-dotenv>=1.0.0"]
-image = [
-    "Pillow>=10.0.0",
-]
-text = [
-    "reportlab>=4.0.0",
-]
-office = []  # Requires LibreOffice (external program)
+mineru = ["mineru[core]"]
+image = ["Pillow>=10.0.0"]
+text = ["reportlab>=4.0.0"]
 markdown = [
     "markdown>=3.4.0",
     "weasyprint>=60.0",
     "pygments>=2.10.0",
 ]
+dev = [
+    "pytest>=6.0",
+    "pytest-asyncio",
+    "ruff>=0.6.4",
+    "black",
+    "isort",
+    "mypy",
+    "pre-commit",
+    "openai>=1.0.0",
+    "json-repair>=0.30.0",
+]
 all = [
-    "huggingface_hub",
-    "lightrag-hku",
-    "tqdm",
-    "mineru[core]",
+    "openai>=1.0.0",
+    "json-repair>=0.30.0",
     "neo4j>=5.0.0",
-    "python-dotenv>=1.0.0",
+    "mineru[core]",
     "Pillow>=10.0.0",
     "reportlab>=4.0.0",
     "markdown>=3.4.0",
@@ -61,23 +66,9 @@ all = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/HKUDS/RAG-Anything"
-Documentation = "https://github.com/HKUDS/RAG-Anything"
-Repository = "https://github.com/HKUDS/RAG-Anything"
-Issues = "https://github.com/HKUDS/RAG-Anything/issues"
-
-[tool.uv]
-dev-dependencies = [
-    "pytest>=6.0",
-    "pytest-asyncio",
-    "black",
-    "isort",
-    "flake8",
-    "mypy",
-    "openai",
-    "python-dotenv",
-    "neo4j>=5.0.0",
-]
+Homepage = "https://github.com/pepebubaboy-ops/RAG-Anything-main"
+Repository = "https://github.com/pepebubaboy-ops/RAG-Anything-main"
+Issues = "https://github.com/pepebubaboy-ops/RAG-Anything-main/issues"
 
 [tool.setuptools.packages.find]
 include = ["raganything*"]
@@ -90,3 +81,4 @@ version = {attr = "raganything.__version__"}
 
 [tool.ruff]
 target-version = "py310"
+line-length = 88

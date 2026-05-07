@@ -12,14 +12,14 @@ from .rag_index import write_jsonl
 
 
 _MENTION_TOKEN_PATTERN = r"[A-ZА-ЯЁ][A-Za-zА-Яа-яЁё0-9'’\-]*"
-_MENTION_CORE_PATTERN = rf"{_MENTION_TOKEN_PATTERN}(?:\s+{_MENTION_TOKEN_PATTERN}){{0,3}}"
+_MENTION_CORE_PATTERN = (
+    rf"{_MENTION_TOKEN_PATTERN}(?:\s+{_MENTION_TOKEN_PATTERN}){{0,3}}"
+)
 _MENTION_YEAR_SUFFIX_PATTERN = (
     r"(?:\s*(?:\(|\[)\s*(?:1[0-9]{3}|20[0-9]{2})\s*[-–—/]\s*"
     r"(?:1[0-9]{3}|20[0-9]{2})\s*(?:\)|\]))?"
 )
-_MENTION_PATTERN = re.compile(
-    rf"{_MENTION_CORE_PATTERN}{_MENTION_YEAR_SUFFIX_PATTERN}"
-)
+_MENTION_PATTERN = re.compile(rf"{_MENTION_CORE_PATTERN}{_MENTION_YEAR_SUFFIX_PATTERN}")
 _MENTION_NOISE_NORMALIZED = {
     "claim",
     "claims",

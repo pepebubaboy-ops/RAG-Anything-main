@@ -8,7 +8,7 @@ from raganything.cli import main
 
 if __name__ == "__main__":
     warnings.warn(
-        "scripts/genealogy_build.py is deprecated. Use `raganything genealogy build ...`.",
+        "scripts/genealogy_build.py is deprecated. Use `genealogy-rag genealogy build ...`.",
         DeprecationWarning,
         stacklevel=2,
     )

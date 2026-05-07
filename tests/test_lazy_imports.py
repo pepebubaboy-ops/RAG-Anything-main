@@ -12,17 +12,20 @@ def _clear_raganything_modules() -> None:
 
 
 def test_import_genealogy_does_not_force_heavy_modules() -> None:
-    had_lightrag = "lightrag" in sys.modules
     had_mineru = "mineru" in sys.modules
+    had_neo4j = "neo4j" in sys.modules
+    had_openai = "openai" in sys.modules
 
     _clear_raganything_modules()
 
     importlib.import_module("raganything.genealogy")
 
-    if not had_lightrag:
-        assert "lightrag" not in sys.modules
     if not had_mineru:
         assert "mineru" not in sys.modules
+    if not had_neo4j:
+        assert "neo4j" not in sys.modules
+    if not had_openai:
+        assert "openai" not in sys.modules
 
 
 def test_import_raganything_and_genealogy_in_subprocess() -> None:

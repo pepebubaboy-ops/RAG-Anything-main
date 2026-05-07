@@ -86,9 +86,17 @@ def _candidate_years_compatible(
     mention_death = _year(mention.attributes.get("death_year"))
     person_birth = _year(person.get("birth_year"))
     person_death = _year(person.get("death_year"))
-    if mention_birth is not None and person_birth is not None and mention_birth != person_birth:
+    if (
+        mention_birth is not None
+        and person_birth is not None
+        and mention_birth != person_birth
+    ):
         return False
-    if mention_death is not None and person_death is not None and mention_death != person_death:
+    if (
+        mention_death is not None
+        and person_death is not None
+        and mention_death != person_death
+    ):
         return False
     return True
 
@@ -118,7 +126,9 @@ def resolve_mentions_to_people(
             for candidate in candidates
             if _candidate_years_compatible(mention, candidate)
         ]
-        mention.candidate_person_ids = [_person_id(candidate) for candidate in compatible_candidates]
+        mention.candidate_person_ids = [
+            _person_id(candidate) for candidate in compatible_candidates
+        ]
 
         if not candidates:
             unresolved_mentions.append(
@@ -138,7 +148,9 @@ def resolve_mentions_to_people(
                     "mention_id": mention.mention_id,
                     "surface": mention.surface,
                     "normalized_name": mention.normalized_name,
-                    "candidate_person_ids": [_person_id(candidate) for candidate in candidates],
+                    "candidate_person_ids": [
+                        _person_id(candidate) for candidate in candidates
+                    ],
                     "reason": "year_mismatch",
                 }
             )
@@ -173,7 +185,9 @@ def resolve_mentions_to_people(
             {
                 "person_id": person_id,
                 "name": _person_name(person),
-                "normalized_name": normalize_name(str(person.get("normalized_name") or "")),
+                "normalized_name": normalize_name(
+                    str(person.get("normalized_name") or "")
+                ),
                 "mention_ids": [],
                 "surfaces": [],
                 "claim_ids": [],
