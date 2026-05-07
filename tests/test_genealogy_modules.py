@@ -13,6 +13,7 @@ from raganything.genealogy.llm_claim_extraction import (
     run_llm_claim_pipeline,
 )
 from raganything.genealogy.mentions import extract_mentions_from_text
+from raganything.genealogy.models import ClaimStatus
 from raganything.genealogy.rag_index import read_jsonl
 from raganything.genealogy.query_resolution import resolve_genealogy_query
 from raganything.genealogy.retrieval import (
@@ -381,7 +382,7 @@ def test_llm_candidate_search_finds_genealogy_chunks() -> None:
     assert {"женат", "жена", "детей", "родила"} <= set(candidates[0].trigger_terms)
 
 
-def test_llm_claim_pipeline_repairs_validates_and_builds_graph(tmp_path: Path) -> None:
+def _write_llm_input_dir(tmp_path: Path, text: str) -> Path:
     input_dir = tmp_path / "input"
     input_dir.mkdir()
     source_id = "source-test"
@@ -390,8 +391,8 @@ def test_llm_claim_pipeline_repairs_validates_and_builds_graph(tmp_path: Path) -
             [
                 {
                     "source_id": source_id,
-                    "path": str(input_dir / "fixture.pdf"),
-                    "title": "fixture.pdf",
+                    "path": str(input_dir / "fixture.txt"),
+                    "title": "fixture.txt",
                     "metadata": {},
                 }
             ],
@@ -401,29 +402,25 @@ def test_llm_claim_pipeline_repairs_validates_and_builds_graph(tmp_path: Path) -
         + "\n",
         encoding="utf-8",
     )
-    source_chunks = [
-        {
-            "chunk_id": "chunk-heading",
-            "source_id": source_id,
-            "text": "Алексей Михайлович (1629-1676)",
-            "ordinal": 0,
-            "page_idx": 1,
-            "content_type": "text",
-            "metadata": {},
-        },
-        {
-            "chunk_id": "chunk-family",
-            "source_id": source_id,
-            "text": "Был дважды женат. Первая жена Мария Милославская родила ему 13 детей.",
-            "ordinal": 1,
-            "page_idx": 1,
-            "content_type": "text",
-            "metadata": {},
-        },
-    ]
+    source_chunk = {
+        "chunk_id": "chunk-family",
+        "source_id": source_id,
+        "text": text,
+        "ordinal": 0,
+        "page_idx": 1,
+        "content_type": "text",
+        "metadata": {},
+    }
     with (input_dir / "source_chunks.jsonl").open("w", encoding="utf-8") as handle:
-        for row in source_chunks:
-            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+        handle.write(json.dumps(source_chunk, ensure_ascii=False) + "\n")
+    return input_dir
+
+
+def test_llm_claim_pipeline_repairs_validates_and_builds_graph(tmp_path: Path) -> None:
+    input_dir = _write_llm_input_dir(
+        tmp_path,
+        "Алексей Михайлович был женат. Первая жена Мария Милославская родила ему 13 детей.",
+    )
 
     assert robust_json_loads('```json\n{"claims": [{"claim_type": "spouse",}],}\n```')
 
@@ -459,12 +456,120 @@ def test_llm_claim_pipeline_repairs_validates_and_builds_graph(tmp_path: Path) -
     assert (output_dir / "llm_extraction_raw.jsonl").exists()
     assert (output_dir / "llm_claim_candidates.jsonl").exists()
 
+    claims = list(read_jsonl(output_dir / "claims.jsonl"))
+    assert len(claims) == 1
+    assert claims[0]["status"] == ClaimStatus.ACCEPTED.value
+    assert claims[0]["confidence"] >= 0.55
+    assert list(read_jsonl(output_dir / "llm_rejected_claims.jsonl")) == []
+
     relationships = json.loads(
         (output_dir / "relationships.json").read_text(encoding="utf-8")
     )
     assert len(relationships) == 1
     assert relationships[0]["relationship_type"] == "spouse_of"
     assert relationships[0]["status"] == "accepted"
+
+
+def test_llm_claim_lifecycle_blocks_low_confidence_and_unsupported_quotes(
+    tmp_path: Path,
+) -> None:
+    input_dir = _write_llm_input_dir(
+        tmp_path,
+        "Alice Doe was child of Bob Doe.",
+    )
+
+    def fake_completion(_prompt: str, _candidate: object) -> str:
+        return json.dumps(
+            {
+                "claims": [
+                    {
+                        "claim_type": "parent_child",
+                        "child": {"name": "Alice Doe"},
+                        "parents": [{"name": "Bob Doe"}],
+                        "evidence_quote": "Alice Doe was child of Bob Doe",
+                        "confidence": 0.0,
+                    },
+                    {
+                        "claim_type": "parent_child",
+                        "child": {"name": "Alice Doe"},
+                        "parents": [{"name": "Carol Doe"}],
+                        "evidence_quote": "Alice Doe was child of Carol Doe",
+                        "confidence": 0.9,
+                    },
+                    {
+                        "claim_type": "parent_child",
+                        "child": {"name": "Alice Doe"},
+                        "parents": [],
+                        "evidence_quote": "Alice Doe was child of Bob Doe",
+                        "confidence": 0.9,
+                    },
+                ]
+            },
+            ensure_ascii=False,
+        )
+
+    output_dir = tmp_path / "out"
+    result = run_llm_claim_pipeline(
+        input_dir,
+        output_dir,
+        model="fake-model",
+        completion_func=fake_completion,
+    )
+
+    assert result.claims_count == 0
+    assert result.people_count == 0
+    assert result.details["accepted_claim_candidates_count"] == 0
+    assert result.details["pending_claim_candidates_count"] == 1
+    assert result.details["rejected_claim_candidates_count"] == 2
+    assert list(read_jsonl(output_dir / "claims.jsonl")) == []
+
+    relationships = json.loads(
+        (output_dir / "relationships.json").read_text(encoding="utf-8")
+    )
+    assert relationships == []
+
+    audit_rows = list(read_jsonl(output_dir / "llm_rejected_claims.jsonl"))
+    assert len(audit_rows) == 3
+    pending = next(row for row in audit_rows if row["status"] == "pending")
+    rejected_reasons = {
+        row["reason"]
+        for row in audit_rows
+        if row["status"] == ClaimStatus.REJECTED.value
+    }
+    assert pending["reason"] == "low_confidence"
+    assert pending["claim"]["confidence"] == 0.0
+    assert {"unsupported_evidence_quote", "malformed_payload"} <= rejected_reasons
+    unsupported = next(
+        row for row in audit_rows if row["reason"] == "unsupported_evidence_quote"
+    )
+    assert unsupported["raw_claim"]["confidence"] == 0.9
+
+
+def test_fixtures_do_not_accept_zero_confidence_claims() -> None:
+    def rows_from_payload(payload: object) -> list[dict]:
+        if isinstance(payload, dict):
+            rows = [payload]
+            for value in payload.values():
+                rows.extend(rows_from_payload(value))
+            return rows
+        if isinstance(payload, list):
+            rows = []
+            for item in payload:
+                rows.extend(rows_from_payload(item))
+            return rows
+        return []
+
+    accepted_zero_confidence: list[str] = []
+    for path in Path("tests/fixtures").rglob("*.json"):
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        for row in rows_from_payload(payload):
+            if (
+                row.get("status") == ClaimStatus.ACCEPTED.value
+                and row.get("confidence") == 0.0
+            ):
+                accepted_zero_confidence.append(str(path))
+
+    assert accepted_zero_confidence == []
 
 
 def test_build_living_graph_public_api_filters_relations(tmp_path: Path) -> None:

@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Sequence, Tuple
 
+from .models import ClaimStatus, claim_row_is_accepted
 from .normalize import normalize_name
 from .rag_index import write_jsonl
 
@@ -218,7 +219,7 @@ def _add_relationship(
             "evidence_ids": sorted(set(evidence_ids)),
             "confidence": float(claim.get("confidence") or 0.0),
             "support_count": 1,
-            "status": "accepted" if claim.get("applied", True) else "pending",
+            "status": ClaimStatus.ACCEPTED.value,
             "derived": derived,
             "symmetric": symmetric,
             "inference_rule": inference_rule,
@@ -237,8 +238,8 @@ def _add_relationship(
     existing["support_count"] = len(existing["claim_ids"]) or int(
         existing.get("support_count") or 1
     )
-    if existing["status"] == "pending" and claim.get("applied", True):
-        existing["status"] = "accepted"
+    if existing["status"] == ClaimStatus.PENDING.value and claim_row_is_accepted(claim):
+        existing["status"] = ClaimStatus.ACCEPTED.value
 
 
 def _conflict(
@@ -551,12 +552,15 @@ def build_knowledge_graph_artifact(
     claim_rows: Sequence[Dict[str, Any]],
     resolution: Dict[str, Any] | None = None,
 ) -> KnowledgeGraphArtifact:
+    accepted_claim_rows = [
+        claim for claim in claim_rows if claim_row_is_accepted(claim)
+    ]
     person_index = _index_people(people)
     mentions_by_name = _resolution_mentions_by_normalized_name(resolution)
     relationships: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
     conflicts: List[Dict[str, Any]] = []
 
-    for claim in claim_rows:
+    for claim in accepted_claim_rows:
         claim_type = str(claim.get("claim_type") or "")
         data = claim.get("data") or {}
         if claim_type == "parent_child":

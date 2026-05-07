@@ -27,7 +27,7 @@ from .knowledge_graph import (
     write_knowledge_graph_artifacts,
 )
 from .mentions import MentionRecord, extract_mentions_from_text, write_mentions
-from .models import Claim, PersonSpec
+from .models import Claim, PersonSpec, normalize_claim_status
 from .normalize import normalize_name
 from .rag_index import (
     SourceChunk,
@@ -297,6 +297,8 @@ def _claims_to_jsonl_row(claim: Claim, applied: bool) -> Dict[str, Any]:
         "evidence": [asdict(evidence) for evidence in claim.evidence],
         "notes": claim.notes,
         "applied": applied,
+        "status": normalize_claim_status(claim.status),
+        "reason": claim.reason,
     }
     row["claim_id"] = claim_id_for_row(row)
     for evidence in row["evidence"]:

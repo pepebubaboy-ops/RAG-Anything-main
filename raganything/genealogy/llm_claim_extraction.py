@@ -22,7 +22,14 @@ from .knowledge_graph import (
     write_knowledge_graph_artifacts,
 )
 from .mentions import MentionRecord, extract_mentions_from_text, write_mentions
-from .models import Claim, Evidence
+from .models import (
+    MIN_ACCEPTED_CLAIM_CONFIDENCE,
+    Claim,
+    ClaimStatus,
+    Evidence,
+    claim_row_is_accepted,
+    normalize_claim_status,
+)
 from .rag_index import read_jsonl, write_jsonl, write_rag_documents
 from .resolution import resolve_mentions_to_people, write_person_resolution
 from .results import BuildResult
@@ -156,7 +163,9 @@ def _coerce_year(value: Any) -> int | None:
     return year
 
 
-def _coerce_confidence(value: Any, default: float = 0.65) -> float:
+def _coerce_confidence(value: Any, default: float | None = None) -> float | None:
+    if value is None:
+        return default
     try:
         confidence = float(value)
     except (TypeError, ValueError):
@@ -592,6 +601,7 @@ def _claim_row_from_raw(
     *,
     candidate: LLMCandidateChunk,
     source_path: str,
+    min_accepted_confidence: float = MIN_ACCEPTED_CLAIM_CONFIDENCE,
 ) -> tuple[dict[str, Any] | None, str | None]:
     claim_type = str(raw_claim.get("claim_type") or "")
     if claim_type not in SUPPORTED_CLAIM_TYPES:
@@ -599,7 +609,11 @@ def _claim_row_from_raw(
 
     quote = _evidence_quote(raw_claim)
     if not _quote_is_supported(quote, candidate):
-        return None, "rejected_no_evidence_quote"
+        return None, "unsupported_evidence_quote"
+
+    confidence = _coerce_confidence(raw_claim.get("confidence"))
+    if confidence is None:
+        return None, "malformed_confidence"
 
     if claim_type == "parent_child":
         child = _person_payload(raw_claim.get("child") or raw_claim.get("person"))
@@ -611,9 +625,9 @@ def _claim_row_from_raw(
         parents = [_person_payload(parent) for parent in parents_payload]
         parents = [parent for parent in parents if parent.get("name")]
         if not _person_name_is_specific(child) or not parents:
-            return None, "rejected_missing_person_role"
+            return None, "malformed_payload"
         if any(not _person_name_is_specific(parent) for parent in parents):
-            return None, "rejected_generic_person_name"
+            return None, "malformed_payload"
         data = {"parents": parents[:2], "child": child}
     elif claim_type == "spouse":
         person1 = _person_payload(raw_claim.get("person1") or raw_claim.get("spouse1"))
@@ -621,13 +635,19 @@ def _claim_row_from_raw(
         if not _person_name_is_specific(person1) or not _person_name_is_specific(
             person2
         ):
-            return None, "rejected_missing_person_role"
+            return None, "malformed_payload"
         data = {"person1": person1, "person2": person2}
     else:
         person = _person_payload(raw_claim.get("person") or raw_claim.get("subject"))
         if not _person_name_is_specific(person):
-            return None, "rejected_missing_person_role"
+            return None, "malformed_payload"
         data = {"person": person, "attributes": raw_claim.get("attributes") or {}}
+
+    status = ClaimStatus.ACCEPTED.value
+    reason = None
+    if confidence < min_accepted_confidence:
+        status = ClaimStatus.PENDING.value
+        reason = "low_confidence"
 
     evidence = {
         "file_path": source_path,
@@ -639,16 +659,18 @@ def _claim_row_from_raw(
     }
     row = {
         "claim_type": claim_type,
-        "confidence": _coerce_confidence(raw_claim.get("confidence")),
+        "confidence": confidence,
         "data": data,
         "evidence": [evidence],
         "notes": raw_claim.get("notes"),
         "applied": claim_type in {"parent_child", "spouse"},
+        "status": status,
+        "reason": reason,
         "raw_llm": raw_claim,
     }
     row["claim_id"] = claim_id_for_row(row)
     row["evidence"][0]["evidence_id"] = evidence_id_for_row(row["evidence"][0])
-    return row, None
+    return row, reason
 
 
 def validate_llm_extractions(
@@ -665,7 +687,7 @@ def validate_llm_extractions(
         if candidate is None:
             rows.append(
                 ValidatedClaimRow(
-                    status="rejected",
+                    status=ClaimStatus.REJECTED.value,
                     reason="missing_candidate",
                     candidate_id=raw_row.candidate_id,
                     chunk_id=raw_row.chunk_id,
@@ -677,7 +699,7 @@ def validate_llm_extractions(
         if raw_row.parsed is None:
             rows.append(
                 ValidatedClaimRow(
-                    status="rejected",
+                    status=ClaimStatus.REJECTED.value,
                     reason=raw_row.parse_status,
                     candidate_id=raw_row.candidate_id,
                     chunk_id=raw_row.chunk_id,
@@ -710,9 +732,9 @@ def validate_llm_extractions(
                 )
                 rows.append(
                     ValidatedClaimRow(
-                        status="accepted_candidate"
+                        status=normalize_claim_status(claim_row.get("status"))
                         if claim_row is not None
-                        else "rejected",
+                        else ClaimStatus.REJECTED.value,
                         reason=reason,
                         candidate_id=raw_row.candidate_id,
                         chunk_id=raw_row.chunk_id,
@@ -731,7 +753,9 @@ def write_validated_claims(
     accepted_claims = [
         row.claim
         for row in validated_rows
-        if row.status == "accepted_candidate" and row.claim is not None
+        if row.status == ClaimStatus.ACCEPTED.value
+        and row.claim is not None
+        and claim_row_is_accepted(row.claim)
     ]
     claims_path = output_dir / "claims.jsonl"
     write_jsonl(claims_path, accepted_claims)
@@ -745,7 +769,7 @@ def write_validated_claims(
         (
             asdict(row)
             for row in validated_rows
-            if row.status not in {"accepted_candidate", "empty"}
+            if row.status not in {ClaimStatus.ACCEPTED.value, "empty"}
         ),
     )
     return claims_path, candidates_path, rejected_path
@@ -771,6 +795,8 @@ def _claim_from_row(row: dict[str, Any]) -> Claim:
         evidence=evidence,
         notes=row.get("notes"),
         raw=row.get("raw_llm"),
+        status=normalize_claim_status(row.get("status")),
+        reason=row.get("reason"),
     )
 
 
@@ -836,21 +862,24 @@ def build_graph_from_validated_claims(
     output_dir: Path,
     claim_rows: Sequence[dict[str, Any]],
 ) -> BuildResult:
+    accepted_claim_rows = [row for row in claim_rows if claim_row_is_accepted(row)]
     store = InMemoryGenealogyStore()
-    for row in claim_rows:
+    for row in accepted_claim_rows:
         _apply_claim_to_store(store, _claim_from_row(row))
 
     people, families = _store_to_people_and_families(store)
     chunks = _read_jsonl(output_dir / "source_chunks.jsonl")
     mentions = _load_mentions(input_dir, chunks)
-    person_resolution = resolve_mentions_to_people(mentions, people, claim_rows)
+    person_resolution = resolve_mentions_to_people(
+        mentions, people, accepted_claim_rows
+    )
     write_mentions(output_dir, mentions)
     write_person_resolution(output_dir, person_resolution)
-    write_evidences(output_dir, claim_rows)
+    write_evidences(output_dir, accepted_claim_rows)
     graph_artifact = write_knowledge_graph_artifacts(
         output_dir,
         people=people,
-        claim_rows=claim_rows,
+        claim_rows=accepted_claim_rows,
         resolution=person_resolution,
     )
 
@@ -880,7 +909,7 @@ def build_graph_from_validated_claims(
         output_dir=output_dir,
         people_count=len(people),
         families_count=len(families),
-        claims_count=len(claim_rows),
+        claims_count=len(accepted_claim_rows),
         details={
             "source_chunks_count": len(chunks),
             "mentions_count": len(mentions),
@@ -957,7 +986,9 @@ def run_llm_claim_pipeline(
     accepted_claims = [
         row.claim
         for row in validated_rows
-        if row.status == "accepted_candidate" and row.claim is not None
+        if row.status == ClaimStatus.ACCEPTED.value
+        and row.claim is not None
+        and claim_row_is_accepted(row.claim)
     ]
     result = build_graph_from_validated_claims(
         input_dir=input_dir,
@@ -969,8 +1000,11 @@ def run_llm_claim_pipeline(
             "candidate_chunks_count": len(candidates),
             "llm_raw_extractions_count": len(raw_rows),
             "accepted_claim_candidates_count": len(accepted_claims),
+            "pending_claim_candidates_count": sum(
+                1 for row in validated_rows if row.status == ClaimStatus.PENDING.value
+            ),
             "rejected_claim_candidates_count": sum(
-                1 for row in validated_rows if row.status == "rejected"
+                1 for row in validated_rows if row.status == ClaimStatus.REJECTED.value
             ),
             "empty_candidate_chunks_count": sum(
                 1 for row in validated_rows if row.status == "empty"
