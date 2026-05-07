@@ -146,7 +146,7 @@ def _parse_pdf_to_content_list(
     if parse_method == "mineru" and find_spec("mineru") is None:
         raise RuntimeError(
             "PDF parsing with MinerU requires optional dependency. "
-            "Install extras: pip install 'genealogy-rag-core[mineru]'"
+            "Install extras: pip install 'raganything[mineru]'"
         )
 
     if parse_method == "docling" and shutil.which("docling") is None:

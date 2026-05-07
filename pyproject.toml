@@ -5,13 +5,13 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "genealogy-rag-core"
 dynamic = ["version"]
-authors = [
-    {name = "pepebubaboy-ops"}
-]
 description = "Local-first genealogy extraction and RAG core for private family-history books"
 readme = "README.md"
-license = { text = "MIT" }
 requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "pepebubaboy-ops" },
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3",
@@ -19,8 +19,6 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
-    "Intended Audience :: Developers",
-    "Topic :: Text Processing :: Linguistic",
 ]
 dependencies = []
 
@@ -33,10 +31,18 @@ llm = [
     "openai>=1.0.0",
     "json-repair>=0.30.0",
 ]
-neo4j = ["neo4j>=5.0.0"]
-mineru = ["mineru[core]"]
-image = ["Pillow>=10.0.0"]
-text = ["reportlab>=4.0.0"]
+neo4j = [
+    "neo4j>=5.0.0",
+]
+mineru = [
+    "mineru[core]",
+]
+image = [
+    "Pillow>=10.0.0",
+]
+text = [
+    "reportlab>=4.0.0",
+]
 markdown = [
     "markdown>=3.4.0",
     "weasyprint>=60.0",
@@ -77,7 +83,7 @@ include = ["raganything*"]
 include-package-data = true
 
 [tool.setuptools.dynamic]
-version = {attr = "raganything.__version__"}
+version = { attr = "raganything.__version__" }
 
 [tool.ruff]
 target-version = "py310"

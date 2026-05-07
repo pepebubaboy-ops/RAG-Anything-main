@@ -21,7 +21,6 @@ from .knowledge_graph import (
     write_evidences,
     write_knowledge_graph_artifacts,
 )
-from .json_utils import robust_json_loads
 from .mentions import MentionRecord, extract_mentions_from_text, write_mentions
 from .models import Claim, Evidence
 from .rag_index import read_jsonl, write_jsonl, write_rag_documents
@@ -321,6 +320,50 @@ trigger_terms: {", ".join(candidate.trigger_terms)}
 Text:
 {_context_text(candidate)}
 """.strip()
+
+
+def robust_json_loads(text: str) -> Any | None:
+    raw = str(text or "").strip()
+    if not raw:
+        return None
+    fenced = re.search(r"```(?:json)?\s*(.*?)```", raw, flags=re.DOTALL | re.IGNORECASE)
+    if fenced:
+        raw = fenced.group(1).strip()
+
+    candidates = [raw]
+    first_object = raw.find("{")
+    last_object = raw.rfind("}")
+    if first_object != -1 and last_object > first_object:
+        candidates.append(raw[first_object : last_object + 1])
+    first_array = raw.find("[")
+    last_array = raw.rfind("]")
+    if first_array != -1 and last_array > first_array:
+        candidates.append(raw[first_array : last_array + 1])
+
+    cleaned_candidates: list[str] = []
+    for candidate in candidates:
+        cleaned_candidates.append(candidate)
+        cleaned_candidates.append(re.sub(r",\s*([}\]])", r"\1", candidate))
+
+    seen: set[str] = set()
+    for candidate in cleaned_candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            pass
+
+    try:
+        from json_repair import repair_json
+
+        repaired = repair_json(raw)
+        if isinstance(repaired, str):
+            return json.loads(repaired)
+        return repaired
+    except Exception:
+        return None
 
 
 def _ollama_extra_body(base_url: str, api_key: str) -> dict[str, Any]:

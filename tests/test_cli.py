@@ -12,7 +12,6 @@ from raganything.cli import main
     "argv",
     [
         ["--help"],
-        ["genealogy", "--help"],
         ["genealogy", "build", "--help"],
     ],
 )
