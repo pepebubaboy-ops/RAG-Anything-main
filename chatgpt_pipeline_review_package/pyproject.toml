@@ -1,0 +1,92 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "raganything"
+dynamic = ["version"]
+authors = [
+    {name = "Zirui Guo"}
+]
+description = "RAGAnything: lightweight offline-first genealogy and optional multimodal RAG toolkit"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = []
+
+[project.scripts]
+raganything = "raganything.cli:main"
+
+[project.optional-dependencies]
+rag = [
+    "huggingface_hub",
+    "lightrag-hku",
+    "tqdm",
+]
+mineru = ["mineru[core]"]
+neo4j = ["neo4j>=5.0.0"]
+dotenv = ["python-dotenv>=1.0.0"]
+image = [
+    "Pillow>=10.0.0",
+]
+text = [
+    "reportlab>=4.0.0",
+]
+office = []  # Requires LibreOffice (external program)
+markdown = [
+    "markdown>=3.4.0",
+    "weasyprint>=60.0",
+    "pygments>=2.10.0",
+]
+all = [
+    "huggingface_hub",
+    "lightrag-hku",
+    "tqdm",
+    "mineru[core]",
+    "neo4j>=5.0.0",
+    "python-dotenv>=1.0.0",
+    "Pillow>=10.0.0",
+    "reportlab>=4.0.0",
+    "markdown>=3.4.0",
+    "weasyprint>=60.0",
+    "pygments>=2.10.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/HKUDS/RAG-Anything"
+Documentation = "https://github.com/HKUDS/RAG-Anything"
+Repository = "https://github.com/HKUDS/RAG-Anything"
+Issues = "https://github.com/HKUDS/RAG-Anything/issues"
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=6.0",
+    "pytest-asyncio",
+    "black",
+    "isort",
+    "flake8",
+    "mypy",
+    "openai",
+    "python-dotenv",
+    "neo4j>=5.0.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["raganything*"]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.dynamic]
+version = {attr = "raganything.__version__"}
+
+[tool.ruff]
+target-version = "py310"
