@@ -8,8 +8,9 @@
 
 ## Claim schema and status
 
-- Stabilize accepted, rejected, pending, conflict, and needs_review states.
-- Prevent low-confidence claims from entering the accepted graph.
+- Baseline now includes accepted, rejected, pending, conflict, and needs_review claim states.
+- Baseline now gates accepted LLM claims on supported evidence quotes and confidence >= 0.55.
+- Keep expanding review workflows for pending, rejected, and needs_review audit artifacts.
 
 ## Russian name normalization
 

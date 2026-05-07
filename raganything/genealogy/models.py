@@ -1,7 +1,39 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from enum import Enum
+from typing import Any, Dict, List, Mapping, Optional
+
+
+MIN_ACCEPTED_CLAIM_CONFIDENCE = 0.55
+
+
+class ClaimStatus(str, Enum):
+    """Lifecycle state for extracted genealogy claims."""
+
+    ACCEPTED = "accepted"
+    PENDING = "pending"
+    REJECTED = "rejected"
+    CONFLICT = "conflict"
+    NEEDS_REVIEW = "needs_review"
+
+
+CLAIM_STATUS_VALUES = frozenset(status.value for status in ClaimStatus)
+
+
+def normalize_claim_status(value: Any) -> str:
+    if isinstance(value, ClaimStatus):
+        return value.value
+    if value is None or str(value).strip() == "":
+        return ClaimStatus.ACCEPTED.value
+    status = str(value).strip()
+    if status in CLAIM_STATUS_VALUES:
+        return status
+    return ClaimStatus.NEEDS_REVIEW.value
+
+
+def claim_row_is_accepted(row: Mapping[str, Any]) -> bool:
+    return normalize_claim_status(row.get("status")) == ClaimStatus.ACCEPTED.value
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +87,8 @@ class Claim:
     evidence: List[Evidence] = field(default_factory=list)
     notes: Optional[str] = None
     raw: Optional[Dict[str, Any]] = None
+    status: str = ClaimStatus.ACCEPTED.value
+    reason: Optional[str] = None
 
 
 @dataclass(frozen=True, slots=True)

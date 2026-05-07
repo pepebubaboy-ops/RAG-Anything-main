@@ -6,13 +6,17 @@ family-history books.
 """
 
 from .models import (
+    MIN_ACCEPTED_CLAIM_CONFIDENCE,
     Claim,
+    ClaimStatus,
     Evidence,
     FamilyRecord,
     MediaSpec,
     PersonRecord,
     PersonSpec,
     Task,
+    claim_row_is_accepted,
+    normalize_claim_status,
 )
 from .pipeline import GenealogyPipeline, GenealogyPipelineConfig
 from .build import build_genealogy_tree
@@ -60,8 +64,10 @@ from .extractors import ClaimExtractor, MockClaimExtractor
 __all__ = [
     "BuildResult",
     "Claim",
+    "ClaimStatus",
     "Evidence",
     "FamilyRecord",
+    "MIN_ACCEPTED_CLAIM_CONFIDENCE",
     "MediaSpec",
     "PersonRecord",
     "PersonSpec",
@@ -87,11 +93,13 @@ __all__ = [
     "build_knowledge_graph_artifact",
     "build_living_graph",
     "build_rag_documents_from_artifacts",
+    "claim_row_is_accepted",
     "detect_genealogy_intent",
     "extract_mentions_from_text",
     "export_genealogy",
     "find_candidate_chunks",
     "load_rag_documents",
+    "normalize_claim_status",
     "robust_json_loads",
     "resolve_genealogy_query",
     "retrieve_genealogy_context",
