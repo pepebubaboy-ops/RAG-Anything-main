@@ -28,6 +28,13 @@ from .llm_claim_extraction import (
     validate_llm_extractions,
 )
 from .mentions import MentionRecord, extract_mentions_from_text, write_mentions
+from .name_normalization import (
+    PersonNameParts,
+    generate_name_variants,
+    normalize_name_text,
+    normalize_person_name,
+    split_person_name,
+)
 from .knowledge_graph import (
     KnowledgeGraphArtifact,
     build_knowledge_graph_artifact,
@@ -65,6 +72,7 @@ __all__ = [
     "MediaSpec",
     "PersonRecord",
     "PersonSpec",
+    "PersonNameParts",
     "Task",
     "GenealogyRAGDocument",
     "GenealogyPipeline",
@@ -91,13 +99,17 @@ __all__ = [
     "extract_mentions_from_text",
     "export_genealogy",
     "find_candidate_chunks",
+    "generate_name_variants",
     "load_rag_documents",
+    "normalize_name_text",
+    "normalize_person_name",
     "robust_json_loads",
     "resolve_genealogy_query",
     "retrieve_genealogy_context",
     "resolve_query_person",
     "resolve_mentions_to_people",
     "run_llm_claim_pipeline",
+    "split_person_name",
     "validate_llm_extractions",
     "write_knowledge_graph_artifacts",
     "write_mentions",
