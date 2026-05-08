@@ -94,12 +94,6 @@ def _build_dot_from_people_and_families(
             cid = _escape_dot(str(child_id))
             lines.append(f'  "{family_id}" -> "{cid}" [label="child"];')
 
-        parents = list(family.get("parent_ids") or [])
-        if len(parents) >= 2:
-            p1 = _escape_dot(str(parents[0]))
-            p2 = _escape_dot(str(parents[1]))
-            lines.append(f'  "{p1}" -> "{p2}" [dir=none style=dashed label="spouse"];')
-
     lines.append("}")
     return "\n".join(lines) + "\n"
 

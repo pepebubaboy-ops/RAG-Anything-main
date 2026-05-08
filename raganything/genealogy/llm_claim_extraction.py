@@ -21,9 +21,19 @@ from .knowledge_graph import (
     write_evidences,
     write_knowledge_graph_artifacts,
 )
-from .mentions import MentionRecord, extract_mentions_from_text, write_mentions
+from .mentions import (
+    MentionRecord,
+    _is_person_like_mention,
+    extract_mentions_from_text,
+    write_mentions,
+)
 from .models import Claim, Evidence
-from .rag_index import read_jsonl, write_jsonl, write_rag_documents
+from .rag_index import (
+    read_jsonl,
+    sanitize_source_path,
+    write_jsonl,
+    write_rag_documents,
+)
 from .resolution import resolve_mentions_to_people, write_person_resolution
 from .results import BuildResult
 from .stores import InMemoryGenealogyStore
@@ -67,6 +77,13 @@ GENEALOGY_TRIGGER_TERMS = {
 }
 
 SUPPORTED_CLAIM_TYPES = {"parent_child", "spouse", "person_profile"}
+MIN_ACCEPTED_CLAIM_CONFIDENCE = 0.55
+CLAIM_STATUS_ACCEPTED = "accepted"
+CLAIM_STATUS_PENDING = "pending"
+CLAIM_STATUS_REJECTED = "rejected"
+CLAIM_STATUS_NEEDS_REVIEW = "needs_review"
+CLAIM_STATUS_CONFLICT = "conflict"
+
 GENERIC_PERSON_NAMES = {
     "император",
     "императрица",
@@ -138,6 +155,19 @@ class ValidatedClaimRow:
     chunk_id: str
     claim: dict[str, Any] | None
     raw_claim: dict[str, Any] | None
+    confidence: float | None = None
+    evidence_quote: str | None = None
+    audit_claim: dict[str, Any] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ClaimValidationResult:
+    status: str
+    reason: str | None
+    claim: dict[str, Any] | None = None
+    audit_claim: dict[str, Any] | None = None
+    confidence: float | None = None
+    evidence_quote: str | None = None
 
 
 def _normalize_for_match(value: str) -> str:
@@ -155,11 +185,13 @@ def _coerce_year(value: Any) -> int | None:
     return year
 
 
-def _coerce_confidence(value: Any, default: float = 0.65) -> float:
+def _claim_confidence(value: Any) -> float | None:
+    if value is None or str(value).strip() == "":
+        return None
     try:
         confidence = float(value)
     except (TypeError, ValueError):
-        return default
+        return None
     return max(0.0, min(1.0, confidence))
 
 
@@ -455,7 +487,12 @@ def run_llm_on_candidates(
                     max_tokens=max_tokens,
                 )
             )
-            parsed = robust_json_loads(raw_output)
+            if str(raw_output or "").strip():
+                parsed = robust_json_loads(raw_output)
+                parse_status = "parsed" if parsed is not None else "invalid_json"
+            else:
+                parsed = None
+                parse_status = "empty_response"
             rows.append(
                 LLMRawExtraction(
                     candidate_id=candidate.candidate_id,
@@ -466,7 +503,7 @@ def run_llm_on_candidates(
                     prompt=prompt,
                     raw_output=raw_output,
                     parsed=parsed,
-                    parse_status="parsed" if parsed is not None else "invalid_json",
+                    parse_status=parse_status,
                 )
             )
         except Exception as exc:
@@ -523,12 +560,14 @@ def _person_payload(value: Any) -> dict[str, Any]:
     return {"name": str(value or "").strip()}
 
 
-def _person_name_is_specific(payload: dict[str, Any]) -> bool:
+def _person_payload_issue(payload: dict[str, Any]) -> str | None:
     name = str(payload.get("name") or "").strip()
     if not name:
-        return False
+        return "missing_required_person_role"
     normalized = _normalize_for_match(name)
-    return normalized not in GENERIC_PERSON_NAMES
+    if normalized in GENERIC_PERSON_NAMES:
+        return "role_only_person"
+    return None
 
 
 def _evidence_quote(raw_claim: dict[str, Any]) -> str:
@@ -550,9 +589,16 @@ def _quote_is_supported(quote: str, candidate: LLMCandidateChunk) -> bool:
     return normalized_quote in _normalize_for_match(_context_text(candidate))
 
 
-def _source_path_by_id(sources: Sequence[dict[str, Any]]) -> dict[str, str]:
+def _source_path_by_id(
+    sources: Sequence[dict[str, Any]],
+    input_root: Path | str | None = None,
+) -> dict[str, str]:
     return {
-        str(row.get("source_id") or ""): str(row.get("path") or "")
+        str(row.get("source_id") or ""): sanitize_source_path(
+            str(row.get("path") or ""),
+            input_root,
+        )
+        or ""
         for row in sources
         if str(row.get("source_id") or "")
     }
@@ -595,14 +641,26 @@ def _claim_row_from_raw(
     *,
     candidate: LLMCandidateChunk,
     source_path: str,
-) -> tuple[dict[str, Any] | None, str | None]:
+) -> ClaimValidationResult:
     claim_type = str(raw_claim.get("claim_type") or "")
-    if claim_type not in SUPPORTED_CLAIM_TYPES:
-        return None, "unsupported_claim_type"
-
+    confidence = _claim_confidence(raw_claim.get("confidence"))
     quote = _evidence_quote(raw_claim)
+
+    if claim_type not in SUPPORTED_CLAIM_TYPES:
+        return ClaimValidationResult(
+            status=CLAIM_STATUS_REJECTED,
+            reason="malformed_claim",
+            confidence=confidence,
+            evidence_quote=quote,
+        )
+
     if not _quote_is_supported(quote, candidate):
-        return None, "rejected_no_evidence_quote"
+        return ClaimValidationResult(
+            status=CLAIM_STATUS_REJECTED,
+            reason="unsupported_evidence_quote",
+            confidence=confidence,
+            evidence_quote=quote,
+        )
 
     if claim_type == "parent_child":
         child = _person_payload(raw_claim.get("child") or raw_claim.get("person"))
@@ -610,57 +668,108 @@ def _claim_row_from_raw(
         if isinstance(parents_payload, dict):
             parents_payload = [parents_payload]
         if not isinstance(parents_payload, list):
-            parents_payload = []
+            return ClaimValidationResult(
+                status=CLAIM_STATUS_REJECTED,
+                reason="malformed_claim",
+                confidence=confidence,
+                evidence_quote=quote,
+            )
         parents = [_person_payload(parent) for parent in parents_payload]
         parents = [parent for parent in parents if parent.get("name")]
-        if not _person_name_is_specific(child) or not parents:
-            return None, "rejected_missing_person_role"
-        if any(not _person_name_is_specific(parent) for parent in parents):
-            return None, "rejected_generic_person_name"
+        child_issue = _person_payload_issue(child)
+        if child_issue or not parents:
+            return ClaimValidationResult(
+                status=CLAIM_STATUS_NEEDS_REVIEW,
+                reason=child_issue or "missing_required_person_role",
+                confidence=confidence,
+                evidence_quote=quote,
+            )
+        parent_issues = [_person_payload_issue(parent) for parent in parents]
+        parent_issue = next((issue for issue in parent_issues if issue), None)
+        if parent_issue:
+            return ClaimValidationResult(
+                status=CLAIM_STATUS_NEEDS_REVIEW,
+                reason=parent_issue,
+                confidence=confidence,
+                evidence_quote=quote,
+            )
         data = {"parents": parents[:2], "child": child}
     elif claim_type == "spouse":
         person1 = _person_payload(raw_claim.get("person1") or raw_claim.get("spouse1"))
         person2 = _person_payload(raw_claim.get("person2") or raw_claim.get("spouse2"))
-        if not _person_name_is_specific(person1) or not _person_name_is_specific(
-            person2
-        ):
-            return None, "rejected_missing_person_role"
+        issue = _person_payload_issue(person1) or _person_payload_issue(person2)
+        if issue:
+            return ClaimValidationResult(
+                status=CLAIM_STATUS_NEEDS_REVIEW,
+                reason=issue,
+                confidence=confidence,
+                evidence_quote=quote,
+            )
         data = {"person1": person1, "person2": person2}
     else:
         person = _person_payload(raw_claim.get("person") or raw_claim.get("subject"))
-        if not _person_name_is_specific(person):
-            return None, "rejected_missing_person_role"
+        issue = _person_payload_issue(person)
+        if issue:
+            return ClaimValidationResult(
+                status=CLAIM_STATUS_NEEDS_REVIEW,
+                reason=issue,
+                confidence=confidence,
+                evidence_quote=quote,
+            )
         data = {"person": person, "attributes": raw_claim.get("attributes") or {}}
 
     evidence = {
-        "file_path": source_path,
+        "file_path": sanitize_source_path(source_path),
         "doc_id": candidate.source_id,
         "chunk_id": candidate.chunk_id,
         "page_idx": candidate.page_idx,
         "quote": quote,
         "image_path": None,
     }
+    status = CLAIM_STATUS_ACCEPTED
+    reason = None
+    if confidence is None or confidence < MIN_ACCEPTED_CLAIM_CONFIDENCE:
+        status = CLAIM_STATUS_PENDING
+        reason = "low_confidence"
+
     row = {
         "claim_type": claim_type,
-        "confidence": _coerce_confidence(raw_claim.get("confidence")),
+        "confidence": confidence,
+        "status": status,
         "data": data,
         "evidence": [evidence],
         "notes": raw_claim.get("notes"),
-        "applied": claim_type in {"parent_child", "spouse"},
+        "applied": status == CLAIM_STATUS_ACCEPTED
+        and claim_type in {"parent_child", "spouse"},
         "raw_llm": raw_claim,
     }
     row["claim_id"] = claim_id_for_row(row)
     row["evidence"][0]["evidence_id"] = evidence_id_for_row(row["evidence"][0])
-    return row, None
+    if status == CLAIM_STATUS_ACCEPTED:
+        return ClaimValidationResult(
+            status=status,
+            reason=None,
+            claim=row,
+            confidence=confidence,
+            evidence_quote=quote,
+        )
+    return ClaimValidationResult(
+        status=status,
+        reason=reason,
+        audit_claim=row,
+        confidence=confidence,
+        evidence_quote=quote,
+    )
 
 
 def validate_llm_extractions(
     raw_rows: Sequence[LLMRawExtraction],
     candidates: Sequence[LLMCandidateChunk],
     sources: Sequence[dict[str, Any]],
+    input_root: Path | str | None = None,
 ) -> list[ValidatedClaimRow]:
     candidates_by_id = _candidate_by_id(candidates)
-    paths_by_source = _source_path_by_id(sources)
+    paths_by_source = _source_path_by_id(sources, input_root)
     rows: list[ValidatedClaimRow] = []
 
     for raw_row in raw_rows:
@@ -668,24 +777,28 @@ def validate_llm_extractions(
         if candidate is None:
             rows.append(
                 ValidatedClaimRow(
-                    status="rejected",
+                    status=CLAIM_STATUS_REJECTED,
                     reason="missing_candidate",
                     candidate_id=raw_row.candidate_id,
                     chunk_id=raw_row.chunk_id,
                     claim=None,
                     raw_claim=None,
+                    confidence=None,
+                    evidence_quote=None,
                 )
             )
             continue
         if raw_row.parsed is None:
             rows.append(
                 ValidatedClaimRow(
-                    status="rejected",
+                    status=CLAIM_STATUS_REJECTED,
                     reason=raw_row.parse_status,
                     candidate_id=raw_row.candidate_id,
                     chunk_id=raw_row.chunk_id,
                     claim=None,
                     raw_claim=None,
+                    confidence=None,
+                    evidence_quote=None,
                 )
             )
             continue
@@ -694,33 +807,36 @@ def validate_llm_extractions(
         if not raw_claims:
             rows.append(
                 ValidatedClaimRow(
-                    status="empty",
-                    reason=None,
+                    status=CLAIM_STATUS_REJECTED,
+                    reason="no_claims",
                     candidate_id=raw_row.candidate_id,
                     chunk_id=raw_row.chunk_id,
                     claim=None,
                     raw_claim=None,
+                    confidence=None,
+                    evidence_quote=None,
                 )
             )
             continue
 
         for raw_claim in raw_claims:
             for normalized_claim in _normalize_claim_candidates(raw_claim):
-                claim_row, reason = _claim_row_from_raw(
+                validation = _claim_row_from_raw(
                     normalized_claim,
                     candidate=candidate,
                     source_path=paths_by_source.get(candidate.source_id, ""),
                 )
                 rows.append(
                     ValidatedClaimRow(
-                        status="accepted_candidate"
-                        if claim_row is not None
-                        else "rejected",
-                        reason=reason,
+                        status=validation.status,
+                        reason=validation.reason,
                         candidate_id=raw_row.candidate_id,
                         chunk_id=raw_row.chunk_id,
-                        claim=claim_row,
+                        claim=validation.claim,
                         raw_claim=normalized_claim,
+                        confidence=validation.confidence,
+                        evidence_quote=validation.evidence_quote,
+                        audit_claim=validation.audit_claim,
                     )
                 )
 
@@ -734,7 +850,7 @@ def write_validated_claims(
     accepted_claims = [
         row.claim
         for row in validated_rows
-        if row.status == "accepted_candidate" and row.claim is not None
+        if row.status == CLAIM_STATUS_ACCEPTED and row.claim is not None
     ]
     claims_path = output_dir / "claims.jsonl"
     write_jsonl(claims_path, accepted_claims)
@@ -745,11 +861,7 @@ def write_validated_claims(
     rejected_path = output_dir / "llm_rejected_claims.jsonl"
     write_jsonl(
         rejected_path,
-        (
-            asdict(row)
-            for row in validated_rows
-            if row.status not in {"accepted_candidate", "empty"}
-        ),
+        (asdict(row) for row in validated_rows if row.status != CLAIM_STATUS_ACCEPTED),
     )
     return claims_path, candidates_path, rejected_path
 
@@ -777,40 +889,68 @@ def _claim_from_row(row: dict[str, Any]) -> Claim:
     )
 
 
+def _person_names_from_claim_rows(claim_rows: Sequence[dict[str, Any]]) -> list[str]:
+    names: list[str] = []
+    for row in claim_rows:
+        data = row.get("data") or {}
+        for key in ("child", "person", "person1", "person2"):
+            payload = data.get(key)
+            if isinstance(payload, dict) and str(payload.get("name") or "").strip():
+                names.append(str(payload.get("name")).strip())
+        for parent in data.get("parents") or []:
+            if isinstance(parent, dict) and str(parent.get("name") or "").strip():
+                names.append(str(parent.get("name")).strip())
+    return names
+
+
+def _mention_allowed_for_claim_names(
+    mention: MentionRecord,
+    accepted_person_names: Sequence[str],
+) -> bool:
+    return _is_person_like_mention(
+        mention.surface,
+        mention.normalized_name,
+        accepted_person_names,
+    )
+
+
 def _load_mentions(
-    input_dir: Path, chunks: Sequence[dict[str, Any]]
+    input_dir: Path,
+    chunks: Sequence[dict[str, Any]],
+    claim_rows: Sequence[dict[str, Any]],
 ) -> list[MentionRecord]:
+    accepted_person_names = _person_names_from_claim_rows(claim_rows)
     mentions_path = input_dir / "mentions.jsonl"
     mentions: list[MentionRecord] = []
     if mentions_path.exists():
         for row in read_jsonl(mentions_path):
-            mentions.append(
-                MentionRecord(
-                    mention_id=str(row.get("mention_id") or ""),
-                    source_id=str(row.get("source_id") or ""),
-                    chunk_id=str(row.get("chunk_id") or ""),
-                    surface=str(row.get("surface") or ""),
-                    normalized_name=str(row.get("normalized_name") or ""),
-                    page_idx=row.get("page_idx")
-                    if isinstance(row.get("page_idx"), int)
-                    else None,
-                    span_start=(
-                        row.get("span_start")
-                        if isinstance(row.get("span_start"), int)
-                        else None
-                    ),
-                    span_end=(
-                        row.get("span_end")
-                        if isinstance(row.get("span_end"), int)
-                        else None
-                    ),
-                    mention_type=str(row.get("mention_type") or "person"),
-                    attributes=dict(row.get("attributes") or {}),
-                    candidate_person_ids=[
-                        str(item) for item in row.get("candidate_person_ids") or []
-                    ],
-                )
+            mention = MentionRecord(
+                mention_id=str(row.get("mention_id") or ""),
+                source_id=str(row.get("source_id") or ""),
+                chunk_id=str(row.get("chunk_id") or ""),
+                surface=str(row.get("surface") or ""),
+                normalized_name=str(row.get("normalized_name") or ""),
+                page_idx=row.get("page_idx")
+                if isinstance(row.get("page_idx"), int)
+                else None,
+                span_start=(
+                    row.get("span_start")
+                    if isinstance(row.get("span_start"), int)
+                    else None
+                ),
+                span_end=(
+                    row.get("span_end")
+                    if isinstance(row.get("span_end"), int)
+                    else None
+                ),
+                mention_type=str(row.get("mention_type") or "person"),
+                attributes=dict(row.get("attributes") or {}),
+                candidate_person_ids=[
+                    str(item) for item in row.get("candidate_person_ids") or []
+                ],
             )
+            if _mention_allowed_for_claim_names(mention, accepted_person_names):
+                mentions.append(mention)
         return mentions
 
     for chunk in chunks:
@@ -822,6 +962,7 @@ def _load_mentions(
                 page_idx=chunk.get("page_idx")
                 if isinstance(chunk.get("page_idx"), int)
                 else None,
+                accepted_person_names=accepted_person_names,
             )
         )
     return mentions
@@ -830,7 +971,31 @@ def _load_mentions(
 def _copy_artifact_if_exists(input_dir: Path, output_dir: Path, name: str) -> None:
     source = input_dir / name
     if source.exists() and source.is_file():
-        shutil.copy2(source, output_dir / name)
+        destination = output_dir / name
+        if name == "sources.json":
+            payload = json.loads(source.read_text(encoding="utf-8"))
+            if isinstance(payload, list):
+                for row in payload:
+                    if isinstance(row, dict):
+                        row["path"] = sanitize_source_path(row.get("path"), input_dir)
+            destination.write_text(
+                json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            return
+        if name == "source_chunks.jsonl":
+            rows = []
+            for row in read_jsonl(source):
+                metadata = row.get("metadata")
+                if isinstance(metadata, dict):
+                    metadata["source_path"] = sanitize_source_path(
+                        metadata.get("source_path"),
+                        input_dir,
+                    )
+                rows.append(row)
+            write_jsonl(destination, rows)
+            return
+        shutil.copy2(source, destination)
 
 
 def build_graph_from_validated_claims(
@@ -845,7 +1010,7 @@ def build_graph_from_validated_claims(
 
     people, families = _store_to_people_and_families(store)
     chunks = _read_jsonl(output_dir / "source_chunks.jsonl")
-    mentions = _load_mentions(input_dir, chunks)
+    mentions = _load_mentions(input_dir, chunks, claim_rows)
     person_resolution = resolve_mentions_to_people(mentions, people, claim_rows)
     write_mentions(output_dir, mentions)
     write_person_resolution(output_dir, person_resolution)
@@ -955,12 +1120,17 @@ def run_llm_claim_pipeline(
     )
     write_raw_extractions(output_dir, raw_rows)
 
-    validated_rows = validate_llm_extractions(raw_rows, candidates, sources)
+    validated_rows = validate_llm_extractions(
+        raw_rows,
+        candidates,
+        sources,
+        input_root=input_dir,
+    )
     write_validated_claims(output_dir, validated_rows)
     accepted_claims = [
         row.claim
         for row in validated_rows
-        if row.status == "accepted_candidate" and row.claim is not None
+        if row.status == CLAIM_STATUS_ACCEPTED and row.claim is not None
     ]
     result = build_graph_from_validated_claims(
         input_dir=input_dir,
@@ -973,10 +1143,16 @@ def run_llm_claim_pipeline(
             "llm_raw_extractions_count": len(raw_rows),
             "accepted_claim_candidates_count": len(accepted_claims),
             "rejected_claim_candidates_count": sum(
-                1 for row in validated_rows if row.status == "rejected"
+                1 for row in validated_rows if row.status == CLAIM_STATUS_REJECTED
+            ),
+            "pending_claim_candidates_count": sum(
+                1 for row in validated_rows if row.status == CLAIM_STATUS_PENDING
+            ),
+            "needs_review_claim_candidates_count": sum(
+                1 for row in validated_rows if row.status == CLAIM_STATUS_NEEDS_REVIEW
             ),
             "empty_candidate_chunks_count": sum(
-                1 for row in validated_rows if row.status == "empty"
+                1 for row in validated_rows if row.reason == "no_claims"
             ),
         }
     )

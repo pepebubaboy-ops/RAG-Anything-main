@@ -65,9 +65,8 @@ def test_mention_extraction_supports_english_russian_and_alias_text() -> None:
         "birth_year": 1900,
         "death_year": 1980,
     }
-    assert {"Bob Smith", "Петр", "Алексей", "Мария", "Иван IV", "Иван Грозный"} <= set(
-        by_surface
-    )
+    assert {"Bob Smith", "Иван IV", "Иван Грозный"} <= set(by_surface)
+    assert {"Петр", "Алексей", "Мария"}.isdisjoint(by_surface)
     assert by_surface["Иван IV"].normalized_name == "иван iv"
     assert all(mention.mention_id.startswith("mention-") for mention in mentions)
 
