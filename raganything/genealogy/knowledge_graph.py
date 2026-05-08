@@ -11,6 +11,8 @@ from .rag_index import write_jsonl
 
 PARENT_MIN_AGE_GAP = 12
 PARENT_MAX_AGE_GAP = 80
+MIN_ACCEPTED_CLAIM_CONFIDENCE = 0.55
+CLAIM_STATUS_ACCEPTED = "accepted"
 
 
 def stable_id(prefix: str, *parts: Any) -> str:
@@ -174,6 +176,28 @@ def _relationship_confidence(existing: float, incoming: Any) -> float:
         return existing
 
 
+def _claim_confidence(claim: Dict[str, Any]) -> float:
+    try:
+        return float(claim.get("confidence"))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _claim_has_evidence(claim: Dict[str, Any]) -> bool:
+    return any(isinstance(row, dict) for row in claim.get("evidence") or [])
+
+
+def _claim_can_enter_graph(claim: Dict[str, Any]) -> bool:
+    status = str(claim.get("status") or "").strip().lower()
+    if status:
+        return status == CLAIM_STATUS_ACCEPTED
+    return (
+        _claim_confidence(claim) >= MIN_ACCEPTED_CLAIM_CONFIDENCE
+        and _claim_has_evidence(claim)
+        and claim.get("applied") is not False
+    )
+
+
 def _add_relationship(
     relationships: Dict[Tuple[str, str, str], Dict[str, Any]],
     *,
@@ -217,7 +241,7 @@ def _add_relationship(
             "evidence_ids": sorted(set(evidence_ids)),
             "confidence": float(claim.get("confidence") or 0.0),
             "support_count": 1,
-            "status": "accepted" if claim.get("applied", True) else "pending",
+            "status": CLAIM_STATUS_ACCEPTED,
             "derived": derived,
             "symmetric": symmetric,
             "inference_rule": inference_rule,
@@ -236,8 +260,6 @@ def _add_relationship(
     existing["support_count"] = len(existing["claim_ids"]) or int(
         existing.get("support_count") or 1
     )
-    if existing["status"] == "pending" and claim.get("applied", True):
-        existing["status"] = "accepted"
 
 
 def _conflict(
@@ -556,6 +578,8 @@ def build_knowledge_graph_artifact(
     conflicts: List[Dict[str, Any]] = []
 
     for claim in claim_rows:
+        if not _claim_can_enter_graph(claim):
+            continue
         claim_type = str(claim.get("claim_type") or "")
         data = claim.get("data") or {}
         if claim_type == "parent_child":

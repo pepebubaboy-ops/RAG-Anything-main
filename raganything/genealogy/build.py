@@ -32,6 +32,7 @@ from .normalize import normalize_name
 from .rag_index import (
     SourceChunk,
     SourceDocument,
+    sanitize_source_path,
     source_chunk_from_content_item,
     source_document_for_path,
     write_rag_documents,
@@ -290,11 +291,16 @@ def _apply_claim_to_store(store: InMemoryGenealogyStore, claim: Claim) -> bool:
 
 
 def _claims_to_jsonl_row(claim: Claim, applied: bool) -> Dict[str, Any]:
+    evidence_rows = []
+    for evidence in claim.evidence:
+        row = asdict(evidence)
+        row["file_path"] = sanitize_source_path(row.get("file_path"))
+        evidence_rows.append(row)
     row = {
         "claim_type": claim.claim_type,
         "confidence": claim.confidence,
         "data": claim.data,
-        "evidence": [asdict(evidence) for evidence in claim.evidence],
+        "evidence": evidence_rows,
         "notes": claim.notes,
         "applied": applied,
     }

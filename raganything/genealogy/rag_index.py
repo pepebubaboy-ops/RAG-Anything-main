@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from dataclasses import asdict, dataclass, field
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any, Dict, Iterable, Iterator, List, Sequence
 
 
@@ -11,6 +12,34 @@ def _stable_id(prefix: str, *parts: Any) -> str:
     payload = "\n".join(str(part or "") for part in parts)
     digest = hashlib.md5(payload.encode("utf-8")).hexdigest()
     return f"{prefix}-{digest}"
+
+
+def sanitize_source_path(
+    path: str | None, input_root: str | Path | None = None
+) -> str | None:
+    if path is None:
+        return None
+    raw = str(path).strip()
+    if not raw:
+        return None
+
+    windows_path = PureWindowsPath(raw)
+    if windows_path.is_absolute() or windows_path.drive:
+        return windows_path.name or raw
+
+    path_obj = Path(raw).expanduser()
+    if not path_obj.is_absolute():
+        return raw
+
+    resolved = path_obj.resolve(strict=False)
+    if input_root is not None:
+        root = Path(input_root).expanduser().resolve(strict=False)
+        try:
+            if os.path.commonpath([str(resolved), str(root)]) == str(root):
+                return os.path.relpath(resolved, root)
+        except ValueError:
+            pass
+    return resolved.name or raw
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,7 +74,7 @@ def source_document_for_path(path: str | Path) -> SourceDocument:
     resolved = str(raw_path.resolve(strict=False))
     return SourceDocument(
         source_id=_stable_id("source", resolved),
-        path=resolved,
+        path=sanitize_source_path(resolved) or raw_path.name or resolved,
         title=raw_path.name or resolved,
         metadata={},
     )
